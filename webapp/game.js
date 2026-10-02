@@ -97,6 +97,7 @@ const appState = {
   },
 
   cr: {
+    mode: "online",
     bet: 5000,
     state: "idle",
     multiplier: 1.00,
@@ -112,7 +113,11 @@ const appState = {
     lastPlaneX: 40,
     lastPlaneY: 200,
     lastPlaneAngle: 0,
-    zoomOffset: 0
+    zoomOffset: 0,
+    onlinePolling: null,
+    roundId: 2001,
+    onlinePhase: "waiting",
+    myBetPlaced: false
   },
 
   mn: {
@@ -623,6 +628,8 @@ const TASK_ICONS = {
   play_apple: "🍏",
   play_thimbles: "🪚",
   play_dice: "🎲",
+  play_wheel: "🎡",
+  play_coinflip: "🪙",
   reach_multiplier: "⚡",
   win_games: "🏆",
   high_stake: "💰",
@@ -835,6 +842,9 @@ async function claimTaskReward(taskKey) {
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     audio.play("click");
+    stopCoinFlipPolling();
+    stopAviatorOnlinePolling();
+    document.getElementById("app")?.classList.remove("in-game");
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
@@ -935,10 +945,7 @@ function openGameView(viewId) {
   }
 
   if (viewId === "view-crash") {
-    initCrashCanvas();
-    if (!appState.cr.animId) {
-      appState.cr.animId = requestAnimationFrame(crashLoop);
-    }
+    initCrashGame();
   } else {
     if (appState.cr.animId && appState.cr.state === "idle") {
       cancelAnimationFrame(appState.cr.animId);
@@ -951,7 +958,10 @@ function returnToLobby() {
   audio.play("click");
   triggerHaptic("light");
   stopCoinFlipPolling();
+  stopAviatorOnlinePolling();
   document.getElementById("app")?.classList.remove("in-game");
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
   document.getElementById("tab-lobby").classList.add("active");
   document.querySelector('.tab-btn[data-tab="lobby"]').classList.add("active");
@@ -993,7 +1003,7 @@ document.querySelectorAll('.game-card[data-game="apple"]').forEach(c => {
 document.querySelectorAll('.game-card[data-game="crash"]').forEach(c => {
   c.addEventListener("click", () => {
     openGameView("view-crash");
-    initCrashCanvas();
+    initCrashGame();
   });
 });
 
@@ -1775,17 +1785,22 @@ function crashLoop(now) {
     }
   } else if (appState.cr.state === "flying") {
     multText.style.display = "block";
-    const elapsed = (now - appState.cr.startTime) / 1000;
-    const currentMult = Math.max(1.00, 1.00 + 0.055 * elapsed + 0.0035 * Math.pow(elapsed, 2));
-    appState.cr.multiplier = currentMult;
+    let currentMult = 1.00;
+    if (appState.cr.mode === "online") {
+      currentMult = Math.max(1.00, appState.cr.multiplier || 1.00);
+    } else {
+      const elapsed = (now - appState.cr.startTime) / 1000;
+      currentMult = Math.max(1.00, 1.00 + 0.055 * elapsed + 0.0035 * Math.pow(elapsed, 2));
+      appState.cr.multiplier = currentMult;
 
-    multText.className = "crash-multiplier-center";
-    multText.textContent = `${currentMult.toFixed(2)}x`;
+      multText.className = "crash-multiplier-center";
+      multText.textContent = `${currentMult.toFixed(2)}x`;
 
-    if (!appState.cr.userCashedOut) {
-      const curWin = Math.floor(appState.cr.bet * currentMult);
-      actionBtn.className = "btn-crash-action btn-cashout-mode";
-      actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
+      if (!appState.cr.userCashedOut) {
+        const curWin = Math.floor(appState.cr.bet * currentMult);
+        actionBtn.className = "btn-crash-action btn-cashout-mode";
+        actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
+      }
     }
 
     const x0 = 35;
@@ -1800,9 +1815,9 @@ function crashLoop(now) {
       py = y0 - (y0 - targetY) * Math.pow(p, 1.25);
       angle = -0.38 + 0.1 * p;
     } else {
-      px = targetX + Math.sin(elapsed * 2.2) * (w * 0.07);
-      py = targetY + Math.cos(elapsed * 2.6) * 12;
-      angle = -0.28 + Math.sin(elapsed * 2.2) * 0.08;
+      px = targetX + Math.sin(now * 0.0022) * (w * 0.07);
+      py = targetY + Math.cos(now * 0.0026) * 12;
+      angle = -0.28 + Math.sin(now * 0.0022) * 0.08;
     }
 
     appState.cr.lastPlaneX = px;
@@ -1832,9 +1847,9 @@ function crashLoop(now) {
     crashCtx.stroke();
     crashCtx.shadowBlur = 0;
 
-    drawAviatorPlane(crashCtx, px, py, angle, false, elapsed);
+    drawAviatorPlane(crashCtx, px, py, angle, false, now * 0.001);
 
-    if (currentMult >= appState.cr.crashPoint) {
+    if (appState.cr.mode === "offline" && currentMult >= appState.cr.crashPoint) {
       endCrashRound(false);
     }
   } else if (appState.cr.state === "crashed") {
@@ -1861,6 +1876,211 @@ function crashLoop(now) {
   }
 
   appState.cr.animId = requestAnimationFrame(crashLoop);
+}
+
+function renderAviatorLiveBets(bets, currentUserBet) {
+  const table = document.getElementById("crLiveBetsTable");
+  if (!table) return;
+
+  const totalPlayersEl = document.getElementById("crTotalPlayers");
+  const totalPoolEl = document.getElementById("crTotalPool");
+
+  if (totalPlayersEl) totalPlayersEl.textContent = bets.length;
+  let pool = 0;
+  bets.forEach(b => pool += (b.bet || 0));
+  if (totalPoolEl) totalPoolEl.textContent = `BANK: ${formatMoney(pool)} UZS`;
+
+  table.innerHTML = bets.map(b => {
+    const isMe = b.user_id === USER_ID;
+    const initial = (b.name || "U")[0].toUpperCase();
+    const uname = b.username ? `@${b.username}` : (b.name || "O'yinchi");
+    let rowClass = "cf-bet-row cr-bet-row";
+    let badgeHtml = "";
+
+    if (b.status === "won") {
+      rowClass += " winner";
+      const mText = b.cashout_mult ? `${b.cashout_mult.toFixed(2)}x` : "";
+      badgeHtml = `<span class="cf-p-badge win">+${formatMoney(b.win)} UZS (${mText})</span>`;
+    } else if (b.status === "lost") {
+      rowClass += " loser";
+      badgeHtml = `<span class="cf-p-badge lose">-${formatMoney(b.bet)} UZS</span>`;
+    } else {
+      badgeHtml = `<span class="cf-p-badge pending">Uchmoqda... ⏳</span>`;
+    }
+
+    if (isMe) rowClass += " me";
+
+    return `
+      <div class="${rowClass}">
+        <div class="cf-p-info">
+          <div class="cf-p-avatar">${initial}</div>
+          <span class="cf-p-name">${isMe ? '⭐ Siz' : uname}</span>
+        </div>
+        <div class="cf-p-right" style="display:flex;align-items:center;gap:6px;">
+          <span class="cf-p-amount">${formatMoney(b.bet)} UZS</span>
+          ${badgeHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+let crOnlinePollTimer = null;
+function startAviatorOnlinePolling() {
+  if (crOnlinePollTimer) return;
+  fetchAviatorOnlineStatus();
+  crOnlinePollTimer = setInterval(fetchAviatorOnlineStatus, 250);
+}
+
+function stopAviatorOnlinePolling() {
+  if (crOnlinePollTimer) {
+    clearInterval(crOnlinePollTimer);
+    crOnlinePollTimer = null;
+  }
+}
+
+async function fetchAviatorOnlineStatus() {
+  if (appState.cr.mode !== "online") return;
+  try {
+    const data = await apiFetch(`/api/aviator/status?user_id=${USER_ID}`);
+    if (!data?.ok) return;
+
+    appState.cr.roundId = data.round_id;
+    appState.cr.onlinePhase = data.phase;
+    appState.cr.myBetPlaced = Boolean(data.user_bet);
+
+    const roundTag = document.getElementById("crRoundTag");
+    if (roundTag) roundTag.textContent = `RAUND #${data.round_id}`;
+
+    const histEl = document.getElementById("crHistoryStrip");
+    if (histEl && data.history) {
+      histEl.innerHTML = data.history.map(m => {
+        let cls = "mult-low";
+        if (m >= 10.0) cls = "mult-epic";
+        else if (m >= 3.0) cls = "mult-high";
+        else if (m >= 1.5) cls = "mult-mid";
+        return `<span class="cr-h-badge ${cls}">${m.toFixed(2)}x</span>`;
+      }).join("");
+    }
+
+    renderAviatorLiveBets(data.bets || [], data.user_bet);
+
+    const timerText = document.getElementById("crTimerText");
+    const phaseText = document.getElementById("crPhaseText");
+    const multText = document.getElementById("crashMultText");
+    const actionBtn = document.getElementById("crashActionBtn");
+
+    if (data.phase === "waiting") {
+      appState.cr.state = "idle";
+      appState.cr.multiplier = 1.00;
+      appState.cr.userCashedOut = false;
+      if (timerText) timerText.textContent = `${data.time_left.toFixed(1)}s`;
+      if (phaseText) phaseText.textContent = "STAVKALAR QABUL QILINMOQDA";
+      if (multText) {
+        multText.className = "crash-multiplier-center";
+        multText.textContent = "1.00x";
+      }
+
+      if (actionBtn) {
+        if (data.user_bet) {
+          actionBtn.className = "btn-crash-action btn-danger-mode";
+          actionBtn.textContent = `STAVKANI BEKOR QILISH (-${formatMoney(data.user_bet.bet)} UZS)`;
+        } else {
+          actionBtn.className = "btn-crash-action btn-ready";
+          actionBtn.textContent = "STAVKA QILISH (ONLINE)";
+        }
+      }
+    } else if (data.phase === "flying") {
+      appState.cr.state = "flying";
+      appState.cr.multiplier = data.multiplier;
+      if (timerText) timerText.textContent = "PARVOZDA! 🚀";
+      if (phaseText) phaseText.textContent = "SAMOLYOT HAVODA";
+      if (multText) {
+        multText.className = "crash-multiplier-center";
+        multText.textContent = `${data.multiplier.toFixed(2)}x`;
+      }
+
+      if (actionBtn) {
+        if (data.user_bet && !data.user_bet.cashed_out) {
+          const curWin = Math.floor(data.user_bet.bet * data.multiplier);
+          actionBtn.className = "btn-crash-action btn-cashout-mode";
+          actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
+        } else if (data.user_bet && data.user_bet.cashed_out) {
+          actionBtn.className = "btn-crash-action btn-cashed-mode";
+          actionBtn.textContent = `YUTUQ OLINDI! (+${formatMoney(data.user_bet.win)} UZS)`;
+        } else {
+          actionBtn.className = "btn-crash-action btn-ready";
+          actionBtn.textContent = "RAUND DAVOM ETMOQDA...";
+        }
+      }
+    } else if (data.phase === "crashed") {
+      if (appState.cr.state !== "crashed") {
+        triggerScreenShake();
+        audio.play("boom");
+        triggerHaptic("error");
+        if (data.user_bet && !data.user_bet.cashed_out) {
+          showToast(`💥 Samolyot ${(data.crash_point || data.multiplier).toFixed(2)}x da uchib ketdi! (-${formatMoney(data.user_bet.bet)} UZS)`, false);
+        }
+      }
+      appState.cr.state = "crashed";
+      appState.cr.crashPoint = data.crash_point || data.multiplier;
+      if (timerText) timerText.textContent = "PORTLASH! 💥";
+      if (phaseText) phaseText.textContent = "KEYINGI RAUND KUTILMOQDA...";
+      if (multText) {
+        multText.className = "crash-multiplier-center crashed";
+        multText.textContent = `${(data.crash_point || data.multiplier).toFixed(2)}x UCHIB KETDI!`;
+      }
+      if (actionBtn) {
+        actionBtn.className = "btn-crash-action btn-ready";
+        actionBtn.textContent = "PORTLASH! (KUTILMOQDA)";
+      }
+    }
+  } catch (e) {}
+}
+
+function setCrashMode(mode) {
+  appState.cr.mode = mode;
+  audio.play("click");
+  triggerHaptic("light");
+  const btnOn = document.getElementById("crTabOnline");
+  const btnOff = document.getElementById("crTabOffline");
+  const bar = document.getElementById("crOnlineBar");
+  const liveCard = document.getElementById("crLiveBetsCard");
+
+  if (mode === "online") {
+    btnOn?.classList.add("active");
+    btnOff?.classList.remove("active");
+    if (bar) bar.style.display = "flex";
+    if (liveCard) liveCard.style.display = "flex";
+    startAviatorOnlinePolling();
+  } else {
+    btnOff?.classList.add("active");
+    btnOn?.classList.remove("active");
+    if (bar) bar.style.display = "none";
+    if (liveCard) liveCard.style.display = "none";
+    stopAviatorOnlinePolling();
+    appState.cr.state = "idle";
+    const actionBtn = document.getElementById("crashActionBtn");
+    if (actionBtn) {
+      actionBtn.className = "btn-crash-action btn-ready";
+      actionBtn.textContent = "PARVOZNI BOSHLASH (OFFLINE)";
+    }
+    const multText = document.getElementById("crashMultText");
+    if (multText) {
+      multText.className = "crash-multiplier-center";
+      multText.textContent = "1.00x";
+    }
+  }
+}
+
+function initCrashGame() {
+  initCrashCanvas();
+  if (!appState.cr.animId) {
+    appState.cr.animId = requestAnimationFrame(crashLoop);
+  }
+  document.getElementById("crTabOnline")?.addEventListener("click", () => setCrashMode("online"));
+  document.getElementById("crTabOffline")?.addEventListener("click", () => setCrashMode("offline"));
+  setCrashMode("online");
 }
 
 function startCrashRound() {
@@ -1891,17 +2111,17 @@ function cancelCrashCountdown() {
   appState.cr.state = "idle";
 
   const actionBtn = document.getElementById("crashActionBtn");
-  actionBtn.className = "btn-crash-action btn-ready";
-  actionBtn.textContent = "STAVKA QILISH";
-
-  const badge = document.getElementById("crashStateBadge");
-  badge.textContent = "KUTILMOQDA";
-  badge.style.color = "var(--one-yellow)";
+  if (actionBtn) {
+    actionBtn.className = "btn-crash-action btn-ready";
+    actionBtn.textContent = "PARVOZNI BOSHLASH (OFFLINE)";
+  }
 
   const multText = document.getElementById("crashMultText");
-  multText.style.display = "block";
-  multText.className = "crash-multiplier-center";
-  multText.textContent = "1.00x";
+  if (multText) {
+    multText.style.display = "block";
+    multText.className = "crash-multiplier-center";
+    multText.textContent = "1.00x";
+  }
 
   showToast("Stavka bekor qilindi, mablag' qaytarildi", true);
 }
@@ -1944,18 +2164,18 @@ function launchCrashFlight() {
   }
   appState.cr.crashPoint = crashTarget;
 
-  const badge = document.getElementById("crashStateBadge");
-  badge.textContent = "PARVOZDA!";
-  badge.style.color = "var(--one-green-glow)";
-
   const actionBtn = document.getElementById("crashActionBtn");
-  actionBtn.className = "btn-crash-action btn-cashout-mode";
-  actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(appState.cr.bet)} UZS)`;
+  if (actionBtn) {
+    actionBtn.className = "btn-crash-action btn-cashout-mode";
+    actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(appState.cr.bet)} UZS)`;
+  }
 
   const multText = document.getElementById("crashMultText");
-  multText.style.display = "block";
-  multText.className = "crash-multiplier-center";
-  multText.textContent = "1.00x";
+  if (multText) {
+    multText.style.display = "block";
+    multText.className = "crash-multiplier-center";
+    multText.textContent = "1.00x";
+  }
 }
 
 function cashoutCrash() {
@@ -1976,8 +2196,10 @@ function cashoutCrash() {
   showToast(`🚀 +${formatMoney(winSum)} UZS (${winMult.toFixed(2)}x) YUTUQ!`, true);
 
   const actionBtn = document.getElementById("crashActionBtn");
-  actionBtn.className = "btn-crash-action btn-cashed-mode";
-  actionBtn.textContent = `YUTUQ OLINDI! (+${formatMoney(winSum)} UZS)`;
+  if (actionBtn) {
+    actionBtn.className = "btn-crash-action btn-cashed-mode";
+    actionBtn.textContent = `YUTUQ OLINDI! (+${formatMoney(winSum)} UZS)`;
+  }
 
   apiFetch("/api/game-result", "POST", {
     user_id: USER_ID,
@@ -2001,7 +2223,6 @@ async function endCrashRound(win) {
   appState.cr.zoomOffset = 0;
 
   const multText = document.getElementById("crashMultText");
-  const badge = document.getElementById("crashStateBadge");
   const actionBtn = document.getElementById("crashActionBtn");
 
   if (!appState.cr.userCashedOut) {
@@ -2026,33 +2247,81 @@ async function endCrashRound(win) {
     });
   }
 
-  multText.className = "crash-multiplier-center crashed";
-  multText.textContent = `${appState.cr.crashPoint.toFixed(2)}x UCHIB KETDI!`;
-  badge.textContent = "CRASH!";
-  badge.style.color = "var(--one-red)";
+  if (multText) {
+    multText.className = "crash-multiplier-center crashed";
+    multText.textContent = `${appState.cr.crashPoint.toFixed(2)}x UCHIB KETDI!`;
+  }
 
-  actionBtn.className = "btn-crash-action btn-ready";
-  actionBtn.textContent = "STAVKA QILISH";
+  if (actionBtn) {
+    actionBtn.className = "btn-crash-action btn-ready";
+    actionBtn.textContent = "PARVOZNI BOSHLASH (OFFLINE)";
+  }
 
   clearTimeout(crResetTimer);
   crResetTimer = setTimeout(() => {
     if (appState.cr.state === "crashed") {
       appState.cr.state = "idle";
-      multText.className = "crash-multiplier-center";
-      multText.textContent = "1.00x";
-      badge.textContent = "KUTILMOQDA";
-      badge.style.color = "var(--one-yellow)";
+      if (multText) {
+        multText.className = "crash-multiplier-center";
+        multText.textContent = "1.00x";
+      }
     }
   }, 1500);
 }
 
-document.getElementById("crashActionBtn").addEventListener("click", () => {
-  if (appState.cr.state === "flying") {
-    cashoutCrash();
-  } else if (appState.cr.state === "countdown") {
-    cancelCrashCountdown();
-  } else if (appState.cr.state === "idle" || appState.cr.state === "crashed") {
-    startCrashRound();
+document.getElementById("crashActionBtn")?.addEventListener("click", async () => {
+  if (appState.cr.mode === "online") {
+    if (appState.cr.onlinePhase === "waiting") {
+      if (appState.cr.myBetPlaced) {
+        const res = await apiFetch("/api/aviator/cancel", "POST", { user_id: USER_ID });
+        if (res?.ok) {
+          appState.cr.myBetPlaced = false;
+          updateBalanceUI(res.balance);
+          showToast("Stavka bekor qilindi, mablag' qaytarildi", true);
+        } else {
+          showToast(`❌ ${res?.error || "Xatolik"}`, false);
+        }
+      } else {
+        const betVal = getValidatedBet("crBetInput");
+        if (!betVal) return;
+        const res = await apiFetch("/api/aviator/bet", "POST", {
+          user_id: USER_ID,
+          bet: betVal,
+          first_name: FIRST_NAME,
+          username: USERNAME
+        });
+        if (res?.ok) {
+          appState.cr.myBetPlaced = true;
+          updateBalanceUI(res.balance);
+          showToast(`✅ ${formatMoney(betVal)} UZS stavka qabul qilindi!`, true);
+          triggerHaptic("medium");
+        } else {
+          showToast(`❌ ${res?.error || "Xatolik"}`, false);
+        }
+      }
+    } else if (appState.cr.onlinePhase === "flying") {
+      if (appState.cr.myBetPlaced && !appState.cr.userCashedOut) {
+        const res = await apiFetch("/api/aviator/cashout", "POST", { user_id: USER_ID });
+        if (res?.ok) {
+          appState.cr.userCashedOut = true;
+          updateBalanceUI(res.balance, true);
+          audio.play("win");
+          triggerHaptic("success");
+          fx.confetti();
+          showToast(`🚀 +${formatMoney(res.win)} UZS (${res.multiplier.toFixed(2)}x) YUTUQ!`, true);
+        } else {
+          showToast(`❌ ${res?.error || "Xatolik"}`, false);
+        }
+      }
+    }
+  } else {
+    if (appState.cr.state === "flying") {
+      cashoutCrash();
+    } else if (appState.cr.state === "countdown") {
+      cancelCrashCountdown();
+    } else if (appState.cr.state === "idle" || appState.cr.state === "crashed") {
+      startCrashRound();
+    }
   }
 });
 

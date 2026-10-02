@@ -2885,3 +2885,55 @@ button, input, select, textarea {
   font-weight: 900;
 }
 
+/* ==========================================================================
+   🚀 AVIATOR / CRASH MULTIPLAYER & 1XBET LIVE BETS STYLING
+   ========================================================================== */
+.cr-history-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 10px;
+  background: rgba(10, 20, 32, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cr-h-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.cr-h-badge.mult-low {
+  background: rgba(41, 128, 185, 0.25);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.4);
+}
+
+.cr-h-badge.mult-mid {
+  background: rgba(155, 89, 182, 0.25);
+  color: #9b59b6;
+  border: 1px solid rgba(155, 89, 182, 0.4);
+}
+
+.cr-h-badge.mult-high {
+  background: rgba(46, 204, 113, 0.25);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+}
+
+.cr-h-badge.mult-epic {
+  background: rgba(241, 196, 15, 0.25);
+  color: #f1c40f;
+  border: 1px solid rgba(241, 196, 15, 0.5);
+  box-shadow: 0 0 8px rgba(241, 196, 15, 0.35);
+}
+
+.cr-live-bets-card {
+  max-height: 125px;
+  margin: 4px 8px;
+}
+
+

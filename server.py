@@ -250,6 +250,228 @@ class CoinFlipLiveRoom:
 coinflip_room = CoinFlipLiveRoom()
 
 # ============================================================================
+# 🚀 REAL-TIME SYNCHRONIZED MULTIPLAYER AVIATOR / CRASH LIVE ROOM
+# ============================================================================
+class AviatorLiveRoom:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.round_id = 2001
+        self.phase = "waiting"  # "waiting" (5s) -> "flying" (up to crash) -> "crashed" (3.5s)
+        self.total_phase_duration = 5.0
+        self.phase_end_time = time.time() + 5.0
+        self.flight_start_time = 0.0
+        self.current_mult = 1.00
+        self.crash_point = 1.00
+        self.history = [1.85, 2.40, 1.20, 5.12, 1.05, 3.10]
+        self.bets = {}
+        self.simulated_users = [
+            {"user_id": 9901, "name": "Jasur Crypto", "username": "jasur_crypto"},
+            {"user_id": 9902, "name": "Azamat UZ", "username": "azamat_uz"},
+            {"user_id": 9903, "name": "Farrux Bek", "username": "farrux_77"},
+            {"user_id": 9904, "name": "Bekzod", "username": "bekzod_01"},
+            {"user_id": 9905, "name": "Malika", "username": "malika_star"},
+            {"user_id": 9906, "name": "Islom Trader", "username": "islom_trader"},
+            {"user_id": 9907, "name": "Otabek", "username": "otabek_uzb"},
+            {"user_id": 9908, "name": "Sardor WIN", "username": "sardor_winner"}
+        ]
+        self.populate_simulated_bets()
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def populate_simulated_bets(self):
+        count = random.randint(4, 7)
+        picked = random.sample(self.simulated_users, count)
+        amounts = [2000, 5000, 10000, 25000, 50000, 100000]
+        for u in picked:
+            target = round(random.uniform(1.25, 3.50), 2)
+            amt = random.choice(amounts)
+            self.bets[u["user_id"]] = {
+                "user_id": u["user_id"],
+                "name": u["name"],
+                "username": u["username"],
+                "bet": amt,
+                "target_mult": target,
+                "cashed_out": False,
+                "cashout_mult": 0.0,
+                "win": 0,
+                "status": "in_flight",
+                "is_real": False
+            }
+
+    def _determine_crash_point(self) -> float:
+        if database.get_aviator_rng_enabled():
+            target = database.get_aviator_target()
+            return max(1.00, target)
+        
+        evil = database.get_evil_mode()
+        real_bets = [b for b in self.bets.values() if b.get("is_real")]
+        
+        if evil:
+            r = random.random()
+            if r < 0.45:
+                return 1.00
+            elif r < 0.88:
+                return round(1.01 + random.random() * 0.22, 2)
+            else:
+                return round(1.23 + random.random() * 0.40, 2)
+
+        if real_bets and sum(b["bet"] for b in real_bets) >= 20000:
+            if random.random() < 0.58:
+                return round(1.01 + random.random() * 0.35, 2)
+
+        rand = random.random()
+        if rand < 0.08:
+            return 1.00
+        elif rand < 0.42:
+            return round(1.01 + random.random() * 0.35, 2)
+        else:
+            cp = round(0.92 / (1.0 - ((rand - 0.42) / 0.58) * 0.94), 2)
+            return max(1.36, min(180.0, cp))
+
+    def _loop(self):
+        while self.running:
+            time.sleep(0.1)
+            now = time.time()
+            with self.lock:
+                if self.phase == "waiting":
+                    if now >= self.phase_end_time:
+                        self.phase = "flying"
+                        self.flight_start_time = now
+                        self.current_mult = 1.00
+                        self.crash_point = self._determine_crash_point()
+                        for b in self.bets.values():
+                            b["status"] = "in_flight"
+                            b["cashed_out"] = False
+                            b["cashout_mult"] = 0.0
+                            b["win"] = 0
+
+                elif self.phase == "flying":
+                    dt = now - self.flight_start_time
+                    mult = round(1.0 + 0.08 * (dt ** 1.65), 2)
+                    self.current_mult = mult
+
+                    for b in self.bets.values():
+                        if not b.get("is_real") and not b["cashed_out"]:
+                            if mult >= b.get("target_mult", 2.0):
+                                b["cashed_out"] = True
+                                b["cashout_mult"] = mult
+                                b["win"] = int(b["bet"] * mult)
+                                b["status"] = "won"
+
+                    if mult >= self.crash_point:
+                        self.phase = "crashed"
+                        self.current_mult = self.crash_point
+                        self.total_phase_duration = 3.5
+                        self.phase_end_time = now + 3.5
+                        self.history.insert(0, round(self.crash_point, 2))
+                        self.history = self.history[:10]
+
+                        for uid, b in self.bets.items():
+                            if not b["cashed_out"]:
+                                b["status"] = "lost"
+                                b["win"] = 0
+                                if b.get("is_real"):
+                                    try:
+                                        database.record_game(uid, "aviator_online", b["bet"], 0, 0.0)
+                                    except Exception:
+                                        pass
+
+                elif self.phase == "crashed":
+                    if now >= self.phase_end_time:
+                        self.round_id += 1
+                        self.phase = "waiting"
+                        self.total_phase_duration = 5.0
+                        self.phase_end_time = now + 5.0
+                        self.current_mult = 1.00
+                        self.crash_point = 1.00
+                        self.bets.clear()
+                        self.populate_simulated_bets()
+
+    def place_bet(self, user_id: int, bet: int, name: str, username: str):
+        with self.lock:
+            if self.phase != "waiting":
+                return False, "Stavka qabul qilish vaqti tugadi! Samolyot uchmoqda."
+            if user_id in self.bets and self.bets[user_id].get("is_real"):
+                return False, "Siz bu raundda allaqachon stavka qildingiz!"
+            user = database.get_or_create_user(user_id)
+            if user["balance"] < bet:
+                return False, "Hisobingizda mablag' yetarli emas!"
+            
+            new_bal = database.update_user_balance(user_id, -bet)
+            self.bets[user_id] = {
+                "user_id": user_id,
+                "name": name or "O'yinchi",
+                "username": username or "",
+                "bet": bet,
+                "target_mult": 0.0,
+                "cashed_out": False,
+                "cashout_mult": 0.0,
+                "win": 0,
+                "status": "in_flight",
+                "is_real": True
+            }
+            return True, new_bal
+
+    def cancel_bet(self, user_id: int):
+        with self.lock:
+            if self.phase != "waiting":
+                return False, "Samolyot havoga ko'tarilgan, stavkani bekor qilib bo'lmaydi!"
+            if user_id not in self.bets or not self.bets[user_id].get("is_real"):
+                return False, "Stavka topilmadi!"
+            bet = self.bets[user_id]["bet"]
+            del self.bets[user_id]
+            new_bal = database.update_user_balance(user_id, bet)
+            return True, new_bal
+
+    def cashout(self, user_id: int):
+        with self.lock:
+            if self.phase != "flying":
+                return False, "Samolyot parvozda emas!"
+            if user_id not in self.bets or not self.bets[user_id].get("is_real"):
+                return False, "Faol stavka topilmadi!"
+            b = self.bets[user_id]
+            if b["cashed_out"]:
+                return False, "Siz allaqachon yutuqni olgansiz!"
+            
+            mult = self.current_mult
+            win = int(b["bet"] * mult)
+            b["cashed_out"] = True
+            b["cashout_mult"] = mult
+            b["win"] = win
+            b["status"] = "won"
+            
+            new_bal = database.update_user_balance(user_id, win)
+            try:
+                database.record_game(user_id, "aviator_online", b["bet"], win, mult)
+            except Exception:
+                pass
+            return True, {"balance": new_bal, "win": win, "multiplier": mult}
+
+    def get_status(self, current_user_id: int = 0):
+        with self.lock:
+            now = time.time()
+            time_left = max(0.0, round(self.phase_end_time - now, 1)) if self.phase != "flying" else 0.0
+            bets_list = list(self.bets.values())
+            bets_list.sort(key=lambda b: (
+                0 if b["user_id"] == current_user_id else (1 if b.get("is_real") else 2),
+                -b["bet"]
+            ))
+            return {
+                "round_id": self.round_id,
+                "phase": self.phase,
+                "time_left": time_left,
+                "total_time": self.total_phase_duration,
+                "multiplier": self.current_mult,
+                "crash_point": self.crash_point if self.phase == "crashed" else None,
+                "history": self.history,
+                "bets": bets_list,
+                "user_bet": self.bets.get(current_user_id)
+            }
+
+aviator_room = AviatorLiveRoom()
+
+# ============================================================================
 # ⚡ IN-MEMORY ULTRA-FAST STATIC ASSET CACHE (0.05ms serving directly from RAM)
 # ============================================================================
 STATIC_CACHE = {}
@@ -423,6 +645,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             res = coinflip_room.get_status(uid)
             return self.send_json({"ok": True, **res})
 
+        elif path == "/api/aviator/status":
+            uid = safe_int(query.get("user_id", [999999])[0], 999999)
+            res = aviator_room.get_status(uid)
+            return self.send_json({"ok": True, **res})
+
         # Instant serving from RAM memory (0.05ms)
         if self.serve_cached(path):
             return
@@ -529,6 +756,30 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": True, "balance": res_bal_or_err})
             else:
                 return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
+
+        elif path == "/api/aviator/bet":
+            bet = max(1000, min(10_000_000, safe_int(data.get("bet"), 1000)))
+            name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
+            uname = str(data.get("username") or "")[:40]
+            ok, res_or_err = aviator_room.place_bet(uid, bet, name, uname)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_or_err}, status=400)
+
+        elif path == "/api/aviator/cashout":
+            ok, res_or_err = aviator_room.cashout(uid)
+            if ok:
+                return self.send_json({"ok": True, **res_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_or_err}, status=400)
+
+        elif path == "/api/aviator/cancel":
+            ok, res_or_err = aviator_room.cancel_bet(uid)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_or_err}, status=400)
 
         self.send_json({"error": "Not Found"}, status=404)
 

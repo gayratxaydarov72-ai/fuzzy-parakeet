@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.4">
+  <link rel="stylesheet" href="style.css?v=3.5">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -239,12 +239,45 @@
       <div class="arena-header">
         <button class="back-btn" id="backFromCrash">⬅ Orqaga</button>
         <span class="arena-title">AVIATOR CRASH</span>
-        <div class="crash-status-pill" id="crashStateBadge">KUTILMOQDA</div>
+        <div class="cf-mode-toggle cr-mode-toggle">
+          <button class="cf-tab-btn cr-tab-btn active" id="crTabOnline" data-mode="online">🌐 ONLINE</button>
+          <button class="cf-tab-btn cr-tab-btn" id="crTabOffline" data-mode="offline">🕹 OFFLINE</button>
+        </div>
       </div>
+
+      <!-- Online Status Bar (Synchronized multiplayer room) -->
+      <div class="cf-online-bar cr-online-bar" id="crOnlineBar">
+        <span class="cf-round-tag" id="crRoundTag">RAUND #2001</span>
+        <div class="cf-timer-pill" id="crTimerPill"><span class="cf-timer-dot"></span> <span id="crTimerText">5.0s</span></div>
+        <span class="cf-phase-text" id="crPhaseText">STAVKALAR QABUL QILINMOQDA</span>
+      </div>
+
+      <!-- Crash Multiplier History Badges -->
+      <div class="cr-history-strip" id="crHistoryStrip">
+        <span class="cr-h-badge mult-mid">2.40x</span>
+        <span class="cr-h-badge mult-low">1.20x</span>
+        <span class="cr-h-badge mult-high">5.12x</span>
+        <span class="cr-h-badge mult-low">1.05x</span>
+        <span class="cr-h-badge mult-mid">1.85x</span>
+        <span class="cr-h-badge mult-epic">14.2x</span>
+      </div>
+
       <div class="crash-canvas-area">
         <canvas id="crashCanvas"></canvas>
         <div class="crash-multiplier-center" id="crashMultText">1.00x</div>
       </div>
+
+      <!-- 1xBet Style Live Bets Card (Shows real and active players) -->
+      <div class="cf-live-bets-card cr-live-bets-card" id="crLiveBetsCard">
+        <div class="cf-table-head cr-table-head">
+          <span>🔴 JONLI STAVKALAR (<b id="crTotalPlayers">5</b>)</span>
+          <span id="crTotalPool">BANK: 0 UZS</span>
+        </div>
+        <div class="cf-table-body cr-table-body" id="crLiveBetsTable">
+          <!-- Populated live via JS with 1xBet style green/red highlights -->
+        </div>
+      </div>
+
       <div class="arena-footer">
         <div class="crash-control-panel">
           <div class="bet-row">
@@ -266,7 +299,7 @@
             <button class="b-chip" data-v="25000">25K</button>
             <button class="b-chip" data-v="50000">50K</button>
           </div>
-          <button class="btn-crash-action btn-ready" id="crashActionBtn">STAVKA QILISH</button>
+          <button class="btn-crash-action btn-ready" id="crashActionBtn">STAVKA QILISH (ONLINE)</button>
         </div>
       </div>
     </div>
@@ -476,6 +509,7 @@
           </div>
           <button class="btn-play-game" id="diceRollBtn">TOSHLARNI TASHLASH</button>
         </div>
+      </div>
     </div>
 
     <div class="game-arena-view" id="view-wheel" style="display: none;">
@@ -765,6 +799,6 @@
 
   </div>
 
-  <script src="game.js?v=3.4"></script>
+  <script src="game.js?v=3.5"></script>
 </body>
 </html>
