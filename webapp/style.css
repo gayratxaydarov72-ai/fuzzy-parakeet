@@ -90,6 +90,12 @@ button, input, select, textarea {
 }
 
 .top-nav {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -97,7 +103,7 @@ button, input, select, textarea {
   padding-top: max(8px, env(safe-area-inset-top, 0px));
   background: linear-gradient(180deg, #183150 0%, #0e1e32 100%);
   border-bottom: 2px solid #23446b;
-  z-index: 10;
+  z-index: 100;
   gap: 8px;
   flex-shrink: 0;
 }
@@ -1460,15 +1466,15 @@ button, input, select, textarea {
 }
 
 @keyframes screenShake {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(-6px, 4px) rotate(-1deg); }
-  40% { transform: translate(6px, -4px) rotate(1deg); }
-  60% { transform: translate(-4px, 3px); }
-  80% { transform: translate(4px, -2px); }
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
 }
 
 .screen-shake {
-  animation: screenShake 0.4s ease-out;
+  animation: screenShake 0.35s ease-out;
 }
 
 @keyframes tagPulse {

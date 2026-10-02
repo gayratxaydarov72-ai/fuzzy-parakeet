@@ -69,8 +69,7 @@ const KAMIKAZE_ODDS = {
   3: [2.45, 6.12, 15.31, 38.28, 95.70, 239.25, 598.14, 1495.37, 3738.44, 9346.10]
 };
 
-const APPLE_ODDS = [1.23, 1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.96, 69.91, 349.57];
-const APPLE_MINES_PER_ROW = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4];
+const APPLE_ODDS = [1.93, 3.75, 7.20, 13.80, 26.50, 51.00, 98.00, 188.00, 360.00, 700.00];
 
 const appState = {
   balance: 10000,
@@ -542,11 +541,13 @@ function showToast(msg, isSuccess = true) {
 }
 
 function triggerScreenShake() {
-  const app = document.getElementById("app");
-  if (!app) return;
-  app.classList.remove("screen-shake");
-  void app.offsetWidth;
-  app.classList.add("screen-shake");
+  const activeArena = document.querySelector('.game-arena-view:not([style*="display: none"])');
+  const target = activeArena?.querySelector('.board-scroll-wrap, .cf-coin-stage, .wheel-canvas-container, .crash-stage-wrapper') || activeArena;
+  if (!target) return;
+  target.classList.remove("screen-shake");
+  void target.offsetWidth;
+  target.classList.add("screen-shake");
+  setTimeout(() => target?.classList.remove("screen-shake"), 360);
 }
 
 let balanceAnimId = null;
@@ -1185,6 +1186,19 @@ function onKamikazeClick(r, c, ev) {
       appState.km.row = 10;
       cashoutKamikaze();
     } else {
+      // Dinamik bombalar: har bir to'g'ri topilganda keyingi qatorlardagi bombalar joyi o'zgaradi
+      for (let nextR = r + 1; nextR < 10; nextR++) {
+        const newRow = new Array(5).fill(false);
+        let p = 0;
+        while (p < appState.km.mines) {
+          const idx = Math.floor(Math.random() * 5);
+          if (!newRow[idx]) {
+            newRow[idx] = true;
+            p++;
+          }
+        }
+        appState.km.grid[nextR] = newRow;
+      }
       appState.km.row++;
       updateKamikazeActiveRows();
     }
@@ -1324,7 +1338,8 @@ function renderAppleBoard() {
     const cellsDiv = document.createElement("div");
     cellsDiv.className = "row-cells-group";
 
-    for (let c = 0; c < 5; c++) {
+    // 4 ta olma har qatorda: 2 ta to'g'ri, 2 ta noto'g'ri
+    for (let c = 0; c < 4; c++) {
       const cell = document.createElement("button");
       cell.className = "cell";
       cell.dataset.c = c;
@@ -1370,17 +1385,13 @@ function startAppleGame() {
   appState.ap.playing = true;
   appState.ap.row = 0;
 
+  // Har bir qatorda aniq 2 ta to'g'ri olma, 2 ta noto'g'ri (chirigan) olma
   appState.ap.grid = [];
   for (let r = 0; r < 10; r++) {
-    const row = new Array(5).fill(false);
-    const minesCount = APPLE_MINES_PER_ROW[r];
-    let p = 0;
-    while (p < minesCount) {
-      const idx = Math.floor(Math.random() * 5);
-      if (!row[idx]) {
-        row[idx] = true;
-        p++;
-      }
+    const row = [true, true, false, false];
+    for (let i = row.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [row[i], row[j]] = [row[j], row[i]];
     }
     appState.ap.grid.push(row);
   }
@@ -1404,7 +1415,7 @@ function onAppleClick(r, c, ev) {
   if (Math.random() < apTrapChance) {
     if (!appState.ap.grid[r][c]) {
       const rottenCols = [];
-      for (let col = 0; col < 5; col++) {
+      for (let col = 0; col < 4; col++) {
         if (appState.ap.grid[r][col]) rottenCols.push(col);
       }
       if (rottenCols.length > 0) {
@@ -1448,6 +1459,15 @@ function onAppleClick(r, c, ev) {
       appState.ap.row = 10;
       cashoutApple();
     } else {
+      // 1xBet kabi: har 1 ta to'g'ri olma topilganda, keyingi barcha qatorlardagi noto'g'ri olmalar joyi dinamik o'zgaradi!
+      for (let nextR = r + 1; nextR < 10; nextR++) {
+        const newRow = [true, true, false, false];
+        for (let i = newRow.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newRow[i], newRow[j]] = [newRow[j], newRow[i]];
+        }
+        appState.ap.grid[nextR] = newRow;
+      }
       appState.ap.row++;
       updateAppleActiveRows();
     }
@@ -1458,7 +1478,7 @@ function revealAppleMines() {
   for (let r = 0; r < 10; r++) {
     const rowEl = document.querySelector(`#appleBoard .board-row[data-r="${r}"]`);
     if (!rowEl) continue;
-    for (let c = 0; c < 5; c++) {
+    for (let c = 0; c < 4; c++) {
       const cell = rowEl.querySelector(`.cell[data-c="${c}"]`);
       if (cell.classList.contains("revealed-safe") || cell.classList.contains("revealed-bomb")) continue;
       if (appState.ap.grid[r][c]) {
@@ -2187,6 +2207,39 @@ function cancelCrashCountdown() {
   showToast("Stavka bekor qilindi, mablag' qaytarildi", true);
 }
 
+function generateOfflineCrashPoint() {
+  if (appState.aviatorRngEnabled && appState.aviatorTarget !== null) {
+    return Math.max(1.00, appState.aviatorTarget);
+  }
+  if (appState.evilMode) {
+    const r = Math.random();
+    if (r < 0.50) return 1.00;
+    if (r < 0.85) return Number((1.01 + Math.random() * 0.20).toFixed(2));
+    return Number((1.20 + Math.random() * 0.35).toFixed(2));
+  }
+  // Haqiqiy 1xBet Crash RNG taqsimoti (Mustaqil offline rejim)
+  const r = Math.random();
+  if (r < 0.05) {
+    // 5% ehtimol bilan 1.00x da srazu portlaydi
+    return 1.00;
+  } else if (r < 0.25) {
+    // 20% ehtimol bilan 1.01x - 1.35x oralig'ida
+    return Number((1.01 + Math.random() * 0.34).toFixed(2));
+  } else if (r < 0.60) {
+    // 35% ehtimol bilan 1.35x - 2.50x oralig'ida
+    return Number((1.35 + Math.random() * 1.15).toFixed(2));
+  } else if (r < 0.85) {
+    // 25% ehtimol bilan 2.50x - 6.00x oralig'ida
+    return Number((2.50 + Math.random() * 3.50).toFixed(2));
+  } else if (r < 0.96) {
+    // 11% ehtimol bilan 6.00x - 20.00x oralig'ida
+    return Number((6.00 + Math.random() * 14.00).toFixed(2));
+  } else {
+    // 4% ehtimol bilan 20.00x - 100.00x gacha uzoq parvoz
+    return Number((20.00 + Math.random() * 80.00).toFixed(2));
+  }
+}
+
 function launchCrashFlight() {
   audio.play("takeoff");
   triggerHaptic("medium");
@@ -2195,35 +2248,7 @@ function launchCrashFlight() {
   appState.cr.startTime = performance.now();
   appState.cr.multiplier = 1.00;
 
-  let crashTarget = 1.00;
-  if (appState.aviatorRngEnabled && appState.aviatorTarget !== null) {
-    if (appState.aviatorTarget <= 1.00) {
-      crashTarget = 1.00;
-    } else {
-      crashTarget = appState.aviatorTarget;
-    }
-  } else if (appState.evilMode) {
-    const r = Math.random();
-    if (r < 0.45) {
-      crashTarget = 1.00;
-    } else if (r < 0.88) {
-      crashTarget = Math.floor((1.01 + Math.random() * 0.22) * 100) / 100;
-    } else {
-      crashTarget = Math.floor((1.23 + Math.random() * 0.40) * 100) / 100;
-    }
-  } else {
-    const rand = Math.random();
-    if (rand < 0.03) {
-      crashTarget = 1.00;
-    } else if (rand < 0.22) {
-      crashTarget = Math.floor((1.05 + Math.random() * 0.45) * 100) / 100;
-    } else {
-      crashTarget = Math.floor((0.96 / (1.0 - ((rand - 0.22) / 0.78) * 0.95)) * 100) / 100;
-      if (crashTarget < 1.30) crashTarget = 1.30;
-      if (crashTarget > 250) crashTarget = 250.00;
-    }
-  }
-  appState.cr.crashPoint = crashTarget;
+  appState.cr.crashPoint = generateOfflineCrashPoint();
 
   const actionBtn = document.getElementById("crashActionBtn");
   if (actionBtn) {
@@ -3169,7 +3194,14 @@ async function rollDiceGame() {
   }, 100);
 }
 
-async function finishDiceGame(won, mult, sum) {
+function finishDiceGame(won, mult, sum) {
+  appState.dc.rolling = false;
+  const rollBtn = document.getElementById("diceRollBtn");
+  if (rollBtn) {
+    rollBtn.disabled = false;
+    rollBtn.textContent = "TOSHLARNI TASHLASH";
+  }
+
   if (won) {
     const winSum = Math.floor(appState.dc.bet * mult);
     audio.play("win");
@@ -3177,45 +3209,38 @@ async function finishDiceGame(won, mult, sum) {
     fx.confetti();
     updateBalanceUI(appState.balance + winSum);
 
-    const res = await apiFetch("/api/game-result", "POST", {
+    apiFetch("/api/game-result", "POST", {
       user_id: USER_ID,
       game_name: "dice",
       bet: appState.dc.bet,
       win: winSum,
       multiplier: mult
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
+    }).then(res => {
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }).catch(() => {});
     showToast(`🎉 Yig'indi: ${sum}! +${formatMoney(winSum)} UZS (x${mult.toFixed(2)})`, true);
   } else {
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
 
-    const res = await apiFetch("/api/game-result", "POST", {
+    apiFetch("/api/game-result", "POST", {
       user_id: USER_ID,
       game_name: "dice",
       bet: appState.dc.bet,
       win: 0,
       multiplier: 0
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
+    }).then(res => {
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }).catch(() => {});
     showToast(`💥 Yig'indi: ${sum}! -${formatMoney(appState.dc.bet)} UZS`, false);
   }
-
-  setTimeout(() => {
-    appState.dc.rolling = false;
-    const rollBtn = document.getElementById("diceRollBtn");
-    if (rollBtn) {
-      rollBtn.disabled = false;
-      rollBtn.textContent = "TOSHLARNI TASHLASH";
-    }
-  }, 1200);
 }
 
 /* ==========================================================================
@@ -3420,6 +3445,16 @@ async function spinWheel() {
     spinBtn.textContent = "AYLANMOQDA... 🎡";
   }
 
+  // Xavfsizlik taymeri: hech qachon g'ildirak tugmasi qotib qolmaydi
+  if (appState.wh.watchdog) clearTimeout(appState.wh.watchdog);
+  appState.wh.watchdog = setTimeout(() => {
+    appState.wh.spinning = false;
+    if (spinBtn) {
+      spinBtn.disabled = false;
+      spinBtn.textContent = "AYLANTIRISH 🎡";
+    }
+  }, 6500);
+
   const msgEl = document.getElementById("wheelResultMsg");
   if (msgEl) {
     msgEl.className = "wheel-result-msg";
@@ -3532,6 +3567,18 @@ async function finishSpin(sector, sectorIndex) {
   appState.wh.history.unshift(mult);
   renderWheelHistory();
 
+  if (appState.wh.watchdog) {
+    clearTimeout(appState.wh.watchdog);
+    appState.wh.watchdog = null;
+  }
+
+  appState.wh.spinning = false;
+  const spinBtn = document.getElementById("whSpinBtn");
+  if (spinBtn) {
+    spinBtn.disabled = false;
+    spinBtn.textContent = "AYLANTIRISH 🎡";
+  }
+
   if (mult > 0) {
     updateBalanceUI(appState.balance + winAmount);
 
@@ -3550,17 +3597,18 @@ async function finishSpin(sector, sectorIndex) {
     }
     showToast(`🎉 YUTUQ: +${formatMoney(winAmount)} UZS (${mult}x)`, true);
 
-    const res = await apiFetch("/api/game-result", "POST", {
+    apiFetch("/api/game-result", "POST", {
       user_id: USER_ID,
       game_name: "wheel",
       bet: appState.wh.bet,
       win: winAmount,
       multiplier: mult
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
+    }).then(res => {
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }).catch(() => {});
   } else {
     audio.play("boom");
     triggerHaptic("light");
@@ -3572,27 +3620,19 @@ async function finishSpin(sector, sectorIndex) {
     }
     showToast(`💥 Omadsiz sektor (0x)! -${formatMoney(appState.wh.bet)} UZS`, false);
 
-    const res = await apiFetch("/api/game-result", "POST", {
+    apiFetch("/api/game-result", "POST", {
       user_id: USER_ID,
       game_name: "wheel",
       bet: appState.wh.bet,
       win: 0,
       multiplier: 0
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
+    }).then(res => {
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }).catch(() => {});
   }
-
-  setTimeout(() => {
-    appState.wh.spinning = false;
-    const spinBtn = document.getElementById("whSpinBtn");
-    if (spinBtn) {
-      spinBtn.disabled = false;
-      spinBtn.textContent = "AYLANTIRISH 🎡";
-    }
-  }, 1000);
 }
 
 // Lucky Wheel Bet controls
@@ -3722,11 +3762,31 @@ async function playCoinFlip() {
   }
 
   const choice = appState.cf.choice || "heads";
-  const cfLossChance = appState.evilMode ? 0.75 : 0.50;
-  const isLoss = Math.random() < cfLossChance;
-  const result = isLoss ? (choice === "heads" ? "tails" : "heads") : choice;
+  let result;
+  if (appState.evilMode) {
+    result = Math.random() < 0.75 ? (choice === "heads" ? "tails" : "heads") : (Math.random() < 0.50 ? "heads" : "tails");
+  } else {
+    // Haqiqiy mustaqil tanga tashlash (50% Burgut / 50% Gerb - tanlovga bog'liq emas!)
+    result = Math.random() < 0.50 ? "heads" : "tails";
+  }
 
-  animate3dCoin(result, async () => {
+  // Xavfsizlik taymeri: hech qachon tugma "UCHMOQDA..." holatida qotib qolmaydi
+  const safetyWatchdog = setTimeout(() => {
+    appState.cf.flipping = false;
+    if (actionBtn) {
+      actionBtn.disabled = false;
+      actionBtn.textContent = "TASHLA 🪙 (1.96x)";
+    }
+  }, 3600);
+
+  animate3dCoin(result, () => {
+    clearTimeout(safetyWatchdog);
+    appState.cf.flipping = false;
+    if (actionBtn) {
+      actionBtn.disabled = false;
+      actionBtn.textContent = "TASHLA 🪙 (1.96x)";
+    }
+
     const isWin = result === choice;
     const resName = result === "heads" ? "BURGUT (1.96x)" : "GERB (1.96x)";
 
@@ -3748,17 +3808,18 @@ async function playCoinFlip() {
       }
       showToast(`🎉 TABRIKLAYMIZ! +${formatMoney(winAmt)} UZS (1.96x)`, true);
 
-      const res = await apiFetch("/api/game-result", "POST", {
+      apiFetch("/api/game-result", "POST", {
         user_id: USER_ID,
         game_name: "coinflip",
         bet: betVal,
         win: winAmt,
         multiplier: 1.96
-      });
-      if (res?.ok) {
-        if (res.provably_hash) appState.lastHash = res.provably_hash;
-        if (res.tasks) renderTasksList(res.tasks);
-      }
+      }).then(res => {
+        if (res?.ok) {
+          if (res.provably_hash) appState.lastHash = res.provably_hash;
+          if (res.tasks) renderTasksList(res.tasks);
+        }
+      }).catch(() => {});
     } else {
       audio.play("boom");
       triggerHaptic("error");
@@ -3770,26 +3831,19 @@ async function playCoinFlip() {
       }
       showToast(`💥 Omadsiz! -${formatMoney(betVal)} UZS`, false);
 
-      const res = await apiFetch("/api/game-result", "POST", {
+      apiFetch("/api/game-result", "POST", {
         user_id: USER_ID,
         game_name: "coinflip",
         bet: betVal,
         win: 0,
         multiplier: 0
-      });
-      if (res?.ok) {
-        if (res.provably_hash) appState.lastHash = res.provably_hash;
-        if (res.tasks) renderTasksList(res.tasks);
-      }
+      }).then(res => {
+        if (res?.ok) {
+          if (res.provably_hash) appState.lastHash = res.provably_hash;
+          if (res.tasks) renderTasksList(res.tasks);
+        }
+      }).catch(() => {});
     }
-
-    setTimeout(() => {
-      appState.cf.flipping = false;
-      if (actionBtn) {
-        actionBtn.disabled = false;
-        actionBtn.textContent = "TASHLA 🪙 (1.96x)";
-      }
-    }, 600);
   });
 }
 

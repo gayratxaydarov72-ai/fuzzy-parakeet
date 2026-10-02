@@ -335,21 +335,32 @@ class AviatorLiveRoom:
         evil = database.get_evil_mode()
         if evil:
             r = random.random()
-            if r < 0.45:
+            if r < 0.50:
                 return 1.00
-            elif r < 0.88:
-                return round(1.01 + random.random() * 0.22, 2)
+            elif r < 0.85:
+                return round(1.01 + random.random() * 0.20, 2)
             else:
-                return round(1.23 + random.random() * 0.40, 2)
+                return round(1.20 + random.random() * 0.35, 2)
 
-        rand = random.random()
-        if rand < 0.03:
+        r = random.random()
+        if r < 0.05:
+            # 5% ehtimol bilan 1.00x da portlaydi
             return 1.00
-        elif rand < 0.22:
-            return round(1.05 + random.random() * 0.45, 2)
+        elif r < 0.25:
+            # 20% ehtimol bilan 1.01x - 1.35x oralig'ida
+            return round(1.01 + random.random() * 0.34, 2)
+        elif r < 0.60:
+            # 35% ehtimol bilan 1.35x - 2.50x oralig'ida
+            return round(1.35 + random.random() * 1.15, 2)
+        elif r < 0.85:
+            # 25% ehtimol bilan 2.50x - 6.00x oralig'ida
+            return round(2.50 + random.random() * 3.50, 2)
+        elif r < 0.96:
+            # 11% ehtimol bilan 6.00x - 20.00x oralig'ida
+            return round(6.00 + random.random() * 14.00, 2)
         else:
-            cp = round(0.96 / (1.0 - ((rand - 0.22) / 0.78) * 0.95), 2)
-            return max(1.30, min(250.0, cp))
+            # 4% ehtimol bilan 20.00x - 100.00x gacha uzoq parvoz
+            return round(20.00 + random.random() * 80.00, 2)
 
     def _loop(self):
         while self.running:
