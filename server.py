@@ -305,8 +305,6 @@ class AviatorLiveRoom:
             return max(1.00, target)
         
         evil = database.get_evil_mode()
-        real_bets = [b for b in self.bets.values() if b.get("is_real")]
-        
         if evil:
             r = random.random()
             if r < 0.45:
@@ -316,18 +314,14 @@ class AviatorLiveRoom:
             else:
                 return round(1.23 + random.random() * 0.40, 2)
 
-        if real_bets and sum(b["bet"] for b in real_bets) >= 20000:
-            if random.random() < 0.58:
-                return round(1.01 + random.random() * 0.35, 2)
-
         rand = random.random()
-        if rand < 0.08:
+        if rand < 0.03:
             return 1.00
-        elif rand < 0.42:
-            return round(1.01 + random.random() * 0.35, 2)
+        elif rand < 0.22:
+            return round(1.05 + random.random() * 0.45, 2)
         else:
-            cp = round(0.92 / (1.0 - ((rand - 0.42) / 0.58) * 0.94), 2)
-            return max(1.36, min(180.0, cp))
+            cp = round(0.96 / (1.0 - ((rand - 0.22) / 0.78) * 0.95), 2)
+            return max(1.30, min(250.0, cp))
 
     def _loop(self):
         while self.running:
