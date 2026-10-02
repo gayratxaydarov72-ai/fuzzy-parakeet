@@ -64,7 +64,8 @@ const appState = {
   sound: localStorage.getItem("one_sound") !== "false",
   lastHash: "SHA-256 Kripto himoya yoqilgan",
   evilMode: false,
-  aviatorTarget: null,
+  aviatorRngEnabled: false,
+  aviatorTarget: 1.00,
 
   km: {
     mines: 1,
@@ -636,7 +637,8 @@ async function syncGameSettings() {
     const res = await apiFetch("/api/game-settings");
     if (res?.ok) {
       appState.evilMode = Boolean(res.evil_mode);
-      appState.aviatorTarget = res.aviator_target ? parseFloat(res.aviator_target) : null;
+      appState.aviatorRngEnabled = Boolean(res.aviator_rng_enabled);
+      appState.aviatorTarget = typeof res.aviator_target === "number" ? res.aviator_target : (res.aviator_target ? parseFloat(res.aviator_target) : 1.00);
     }
   } catch (e) {}
 }
@@ -650,8 +652,11 @@ async function initAppData() {
     if (typeof data.evil_mode !== "undefined") {
       appState.evilMode = Boolean(data.evil_mode);
     }
+    if (typeof data.aviator_rng_enabled !== "undefined") {
+      appState.aviatorRngEnabled = Boolean(data.aviator_rng_enabled);
+    }
     if (typeof data.aviator_target !== "undefined") {
-      appState.aviatorTarget = data.aviator_target ? parseFloat(data.aviator_target) : null;
+      appState.aviatorTarget = typeof data.aviator_target === "number" ? data.aviator_target : (data.aviator_target ? parseFloat(data.aviator_target) : 1.00);
     }
     updateBalanceUI(data.user.balance);
 
@@ -1793,8 +1798,12 @@ function launchCrashFlight() {
   appState.cr.multiplier = 1.00;
 
   let crashTarget = 1.00;
-  if (appState.aviatorTarget && appState.aviatorTarget >= 1.00) {
-    crashTarget = appState.aviatorTarget;
+  if (appState.aviatorRngEnabled && appState.aviatorTarget !== null) {
+    if (appState.aviatorTarget <= 1.00) {
+      crashTarget = 1.00;
+    } else {
+      crashTarget = appState.aviatorTarget;
+    }
   } else if (appState.evilMode) {
     const r = Math.random();
     if (r < 0.35) {

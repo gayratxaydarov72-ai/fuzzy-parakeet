@@ -621,28 +621,30 @@ def set_evil_mode(enabled: bool) -> bool:
     set_setting("evil_mode", "1" if enabled else "0")
     return enabled
 
-def get_aviator_target():
-    val = get_setting("aviator_target", "").strip()
-    if val:
-        try:
-            f = float(val)
-            if f >= 1.0:
-                return round(f, 2)
-        except ValueError:
-            pass
-    return None
+def get_aviator_rng_enabled() -> bool:
+    return get_setting("aviator_rng_enabled", "0") == "1"
+
+def set_aviator_rng_enabled(enabled: bool) -> bool:
+    set_setting("aviator_rng_enabled", "1" if enabled else "0")
+    return enabled
+
+def get_aviator_target() -> float:
+    val = get_setting("aviator_target", "1.00").strip()
+    try:
+        f = float(val)
+        return max(0.1, round(f, 2))
+    except (ValueError, TypeError):
+        return 1.00
 
 def set_aviator_target(target):
-    if target is None:
-        set_setting("aviator_target", "")
-    else:
-        try:
-            f = float(target)
-            if f < 1.0:
-                set_setting("aviator_target", "")
-            else:
-                set_setting("aviator_target", str(round(f, 2)))
-        except (ValueError, TypeError):
-            set_setting("aviator_target", "")
+    try:
+        s = str(target).strip().lower().replace("x", "").replace(",", ".")
+        f = float(s)
+        val = max(0.1, round(f, 2))
+        set_setting("aviator_target", str(val))
+        return val
+    except (ValueError, TypeError):
+        set_setting("aviator_target", "1.00")
+        return 1.00
 
 init_db()

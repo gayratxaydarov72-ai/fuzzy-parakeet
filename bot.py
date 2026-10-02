@@ -223,14 +223,18 @@ def get_main_keyboard(user_id: int):
 def get_admin_keyboard():
     evil_on = database.get_evil_mode()
     evil_text = "😈 Evil Mode: ON 🔴" if evil_on else "😇 Evil Mode: OFF 🟢"
+    rng_on = database.get_aviator_rng_enabled()
     aviator_target = database.get_aviator_target()
-    aviator_text = f"🚀 Aviator: {aviator_target:.2f}x" if aviator_target else "🚀 Aviator: Avto 🎲"
+    rng_text = f"🎯 Aviator RNG: ON ({aviator_target:.2f}x) 🔴" if rng_on else "🎲 Aviator RNG: OFF 🟢"
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text=evil_text, callback_data="admin_toggle_evil"),
-                InlineKeyboardButton(text=aviator_text, callback_data="admin_aviator_menu")
+                InlineKeyboardButton(text=rng_text, callback_data="admin_toggle_aviator_rng")
+            ],
+            [
+                InlineKeyboardButton(text="✏️ RNG Koeffitsiyentni o'zgartirish (Merge)", callback_data="admin_ask_aviator_target")
             ],
             [
                 InlineKeyboardButton(text="📊 Yangilash", callback_data="admin_refresh"),
@@ -250,20 +254,17 @@ def get_aviator_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="💥 1.00x (Darhol portlash)", callback_data="set_crash_1.00")
+                InlineKeyboardButton(text="💥 0.50x", callback_data="set_crash_0.50"),
+                InlineKeyboardButton(text="💥 1.00x", callback_data="set_crash_1.00"),
+                InlineKeyboardButton(text="⚡ 1.20x", callback_data="set_crash_1.20")
             ],
             [
-                InlineKeyboardButton(text="⚡ 1.10x", callback_data="set_crash_1.10"),
-                InlineKeyboardButton(text="⚡ 1.25x", callback_data="set_crash_1.25"),
-                InlineKeyboardButton(text="🎯 1.50x", callback_data="set_crash_1.50")
-            ],
-            [
+                InlineKeyboardButton(text="🎯 1.50x", callback_data="set_crash_1.50"),
                 InlineKeyboardButton(text="🎯 2.00x", callback_data="set_crash_2.00"),
-                InlineKeyboardButton(text="🚀 3.00x", callback_data="set_crash_3.00"),
-                InlineKeyboardButton(text="🚀 5.00x", callback_data="set_crash_5.00")
+                InlineKeyboardButton(text="🚀 3.00x", callback_data="set_crash_3.00")
             ],
             [
-                InlineKeyboardButton(text="🎲 Tasodifiy (Avto RNG)", callback_data="set_crash_auto")
+                InlineKeyboardButton(text="🎲 Avto 1xBet RNG (O'chirish)", callback_data="set_crash_auto")
             ],
             [
                 InlineKeyboardButton(text="⬅️ Admin panelga qaytish", callback_data="admin_refresh")
@@ -278,9 +279,10 @@ def render_admin_dashboard():
     total_games = database.get_total_games()
     live_url = get_live_url()
     evil_on = database.get_evil_mode()
-    evil_status = "🔴 YOQILGAN (O'yinchilar ko'pincha yutqazadi)" if evil_on else "🟢 O'CHIRILGAN (Adolatli Provably Fair RNG)"
+    evil_status = "🔴 YOQILGAN (O'yinchilar ko'pincha yutqazadi)" if evil_on else "🟢 O'CHIRILGAN (Adolatli 1xBet RNG)"
+    rng_on = database.get_aviator_rng_enabled()
     aviator_target = database.get_aviator_target()
-    aviator_status = f"🎯 {aviator_target:.2f}x da qat'iy portlaydi" if aviator_target else "🎲 Tasodifiy (Avto RNG)"
+    aviator_status = f"🔴 YOQILGAN ({aviator_target:.2f}x da uchadi/portlaydi)" if rng_on else "🟢 O'CHIRILGAN (Avto 1xBet server RNG)"
 
     return (
         f"👑 <b>NVINDIA GAMES — BOSH ADMIN PANELI</b>\n\n"
@@ -292,12 +294,13 @@ def render_admin_dashboard():
         f"• Jami foydalanuvchilar balansi: <b>{total_balance:,} UZS</b>\n"
         f"• Jami o'ynalgan raundlar: <b>{total_games:,} ta</b>\n"
         f"• Jonli WebApp URL: <code>{live_url}</code>\n\n"
-        f"🎛 <b>O'yin algoritmlarini boshqarish:</b>\n"
+        f"🎛 <b>O'yin algoritmlarini nazorat qilish:</b>\n"
         f"• 😈 <b>Evil Mode:</b> <b>{evil_status}</b>\n"
-        f"• 🚀 <b>Aviator Crash:</b> <b>{aviator_status}</b>\n\n"
+        f"• 🚀 <b>Aviator RNG Boshqaruvi:</b> <b>{aviator_status}</b>\n\n"
         f"🛠 <b>Mavjud boshqaruv buyruqlari:</b>\n"
-        f"• <code>/evil [on/off]</code> — Evil Mode rejimini boshqarish\n"
-        f"• <code>/setcrash &lt;koeffitsiyent/auto&gt;</code> — Aviator portlash nuqtasini belgilash (masalan: <code>/setcrash 1.00</code>)\n"
+        f"• <code>/evil [on/off]</code> — Evil Mode rejimini yoqish/o'chirish\n"
+        f"• <code>/rng [on/off]</code> — Aviator RNG nazoratini yoqish/o'chirish\n"
+        f"• <code>/setcrash &lt;qiymat&gt;</code> — Portlash koeffitsiyentini belgilash (masalan: <code>/setcrash 1.5</code> yoki <code>/setcrash 0.5</code>)\n"
         f"• <code>/ban &lt;user_id&gt; [sabab]</code> — O'yinchini bloklash\n"
         f"• <code>/unban &lt;user_id&gt;</code> — Blokdan chiqarish\n"
         f"• <code>/user &lt;user_id&gt;</code> — O'yinchi profilini ko'rish\n"
@@ -591,6 +594,35 @@ async def admin_url_info_callback(call: types.CallbackQuery):
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
+ADMIN_AWAITING_INPUT = {}
+
+@dp.message(F.text & ~F.text.startswith("/"))
+async def admin_input_handler(message: types.Message):
+    if not is_admin(message.from_user.id):
+        return
+    state = ADMIN_AWAITING_INPUT.get(message.from_user.id)
+    if state == "aviator_target":
+        raw = message.text.strip().lower().replace("x", "").replace(",", ".")
+        try:
+            val = float(raw)
+            val = max(0.1, round(val, 2))
+            database.set_aviator_target(val)
+            database.set_aviator_rng_enabled(True)
+            ADMIN_AWAITING_INPUT.pop(message.from_user.id, None)
+            await message.answer(
+                f"✅ <b>Muvaffaqiyatli saqlandi!</b>\n\n"
+                f"🎯 <b>Aviator RNG: YOQILDI 🔴</b>\n"
+                f"Samolyot endi har safar <b>{val:.2f}x</b> ga yetganda uchib ketadi!\n\n"
+                f"<i>O'chirish uchun <code>/rng off</code> yoki admin paneldagi tugmani bosing.</i>",
+                parse_mode="HTML",
+                reply_markup=get_admin_keyboard()
+            )
+        except ValueError:
+            await message.answer(
+                "❌ <b>Noto'g'ri qiymat kiritildi!</b>\nIltimos, son kiriting. Masalan: <code>1.5</code> yoki <code>0.5</code> yoki <code>1.2x</code>",
+                parse_mode="HTML"
+            )
+
 @dp.message(Command("evil"))
 async def evil_cmd(message: types.Message, command: CommandObject):
     if not is_admin(message.from_user.id):
@@ -609,30 +641,65 @@ async def evil_cmd(message: types.Message, command: CommandObject):
         st = "YOQILDI 🔴" if new_state else "O'CHIRILDI 🟢"
         await message.answer(f"😈 <b>Evil Mode {st}!</b>", parse_mode="HTML")
 
+@dp.message(Command("rng"))
+async def rng_cmd(message: types.Message, command: CommandObject):
+    if not is_admin(message.from_user.id):
+        return
+    arg = (command.args or "").strip().lower()
+    if arg in ("on", "1", "true", "yoq", "start"):
+        database.set_aviator_rng_enabled(True)
+        target = database.get_aviator_target()
+        await message.answer(f"🎯 <b>Aviator RNG YOQILDI 🔴</b>\nSamolyot {target:.2f}x da uchadi.", parse_mode="HTML")
+    elif arg in ("off", "0", "false", "ochir", "stop", "auto", "avto"):
+        database.set_aviator_rng_enabled(False)
+        await message.answer("🟢 <b>Aviator RNG O'CHIRILDI!</b>\nOdatdagi 1xBet avto RNG faollashdi.", parse_mode="HTML")
+    else:
+        curr = database.get_aviator_rng_enabled()
+        new_state = not curr
+        database.set_aviator_rng_enabled(new_state)
+        target = database.get_aviator_target()
+        st = f"YOQILDI 🔴 ({target:.2f}x)" if new_state else "O'CHIRILDI 🟢 (Avto 1xBet RNG)"
+        await message.answer(f"🚀 <b>Aviator RNG {st}!</b>", parse_mode="HTML")
+
 @dp.message(Command("setcrash"))
 async def setcrash_cmd(message: types.Message, command: CommandObject):
     if not is_admin(message.from_user.id):
         return
     arg = (command.args or "").strip().lower()
-    if not arg or arg in ("auto", "avto", "reset", "rng"):
-        database.set_aviator_target(None)
-        await message.answer("🚀 <b>Aviator: Tasodifiy (Avto RNG) rejimi o'rnatildi!</b>", parse_mode="HTML")
-        return
-    try:
-        f = float(arg.replace(",", "."))
-        if f < 1.0:
-            f = 1.0
-        database.set_aviator_target(f)
+    if not arg:
+        ADMIN_AWAITING_INPUT[message.from_user.id] = "aviator_target"
+        curr = database.get_aviator_target()
+        rng_on = database.get_aviator_rng_enabled()
+        curr_str = f"<b>{curr:.2f}x (YOQILGAN 🔴)</b>" if rng_on else f"<b>{curr:.2f}x (O'CHIRILGAN 🟢)</b>"
         await message.answer(
-            f"🚀 <b>Aviator crash nuqtasi o'rnatildi: {f:.2f}x!</b>\n"
-            f"Endi samolyot aynan <b>{f:.2f}x</b> ga yetganda portlaydi.",
+            f"🚀 <b>AVIATOR (CRASH) KOEFFITSIYENTINI BELGILASH:</b>\n\n"
+            f"Hozirgi holat: {curr_str}\n\n"
+            f"Qaysi koeffitsiyentda (mergeda) uchib ketsin?\n"
+            f"Iltimos, sonni chatga yozing (masalan: <code>1.5</code> yoki <code>0.5</code> yoki <code>1.0</code>):\n\n"
+            f"Yoki quyidagi tugmalardan birini bosing:",
+            parse_mode="HTML",
+            reply_markup=get_aviator_keyboard()
+        )
+        return
+
+    if arg in ("auto", "avto", "reset", "off"):
+        database.set_aviator_rng_enabled(False)
+        await message.answer("🟢 <b>Aviator: Avto 1xBet RNG yoqildi (Boshqaruv o'chirildi)!</b>", parse_mode="HTML")
+        return
+
+    try:
+        val = float(arg.replace("x", "").replace(",", "."))
+        val = max(0.1, round(val, 2))
+        database.set_aviator_target(val)
+        database.set_aviator_rng_enabled(True)
+        await message.answer(
+            f"✅ <b>Aviator RNG YOQILDI 🔴</b>\n\n"
+            f"Samolyot endi <b>{val:.2f}x</b> da uchib ketadi!\n"
+            f"<i>O'chirish uchun: <code>/rng off</code> yoki <code>/setcrash auto</code></i>",
             parse_mode="HTML"
         )
     except ValueError:
-        await message.answer(
-            "Foydalanish: <code>/setcrash 1.00</code> yoki <code>/setcrash 1.50</code> yoki <code>/setcrash auto</code>",
-            parse_mode="HTML"
-        )
+        await message.answer("Foydalanish: <code>/setcrash 1.5</code> yoki <code>/setcrash 0.5</code> yoki <code>/setcrash auto</code>", parse_mode="HTML")
 
 @dp.callback_query(F.data == "admin_toggle_evil")
 async def admin_toggle_evil_callback(call: types.CallbackQuery):
@@ -650,20 +717,39 @@ async def admin_toggle_evil_callback(call: types.CallbackQuery):
     except Exception:
         pass
 
-@dp.callback_query(F.data == "admin_aviator_menu")
-async def admin_aviator_menu_callback(call: types.CallbackQuery):
+@dp.callback_query(F.data == "admin_toggle_aviator_rng")
+async def admin_toggle_aviator_rng_callback(call: types.CallbackQuery):
     if not is_admin(call.from_user.id):
         await call.answer("Ruxsat yo'q!", show_alert=True)
         return
+    current = database.get_aviator_rng_enabled()
+    new_state = not current
+    database.set_aviator_rng_enabled(new_state)
+    target = database.get_aviator_target()
+    msg = f"🎯 Aviator RNG YOQILDI! Samolyot {target:.2f}x da uchadi." if new_state else "🟢 Aviator RNG O'CHIRILDI! Avto 1xBet RNG faol."
+    await call.answer(msg, show_alert=True)
+    text = render_admin_dashboard()
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_keyboard())
+    except Exception:
+        pass
+
+@dp.callback_query(F.data == "admin_ask_aviator_target")
+async def admin_ask_aviator_target_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    ADMIN_AWAITING_INPUT[call.from_user.id] = "aviator_target"
     curr = database.get_aviator_target()
-    curr_str = f"<b>{curr:.2f}x</b>" if curr else "<b>🎲 Tasodifiy (Avto RNG)</b>"
+    rng_on = database.get_aviator_rng_enabled()
+    curr_str = f"<b>{curr:.2f}x (YOQILGAN 🔴)</b>" if rng_on else f"<b>{curr:.2f}x (O'CHIRILGAN 🟢)</b>"
     text = (
-        f"🚀 <b>AVIATOR (CRASH) PORTLASH NUQTASINI BOSHQARISH:</b>\n\n"
-        f"Hozirgi belgilangan nuqta: {curr_str}\n\n"
-        f"Samolyot qaysi koeffitsiyentda portlashini tanlang:\n"
-        f"• <b>1.00x</b> tanlansa — samolyot uchishi bilanoq darhol portlaydi!\n"
-        f"• <b>Avto RNG</b> tanlansa — tasodifiy Provably Fair asosida parvoz qiladi.\n\n"
-        f"<i>Shuningdek <code>/setcrash &lt;qiymat&gt;</code> buyrug'i orqali istalgan sonni kiritishingiz mumkin.</i>"
+        f"🚀 <b>AVIATOR (CRASH) KOEFFITSIYENTINI BELGILASH:</b>\n\n"
+        f"Hozirgi holat: {curr_str}\n\n"
+        f"Qaysi koeffitsiyentda (mergeda) uchib ketsin?\n"
+        f"Iltimos, sonni chatga yozing:\n"
+        f"• Masalan: <code>1.5</code>, <code>1.5x</code>, <code>0.5</code>, <code>1.0</code>, <code>2.0</code> va h.k.\n\n"
+        f"Yoki quyidagi tezkor tugmalardan birini tanlang:"
     )
     try:
         await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_aviator_keyboard())
@@ -676,15 +762,17 @@ async def set_crash_callback(call: types.CallbackQuery):
     if not is_admin(call.from_user.id):
         await call.answer("Ruxsat yo'q!", show_alert=True)
         return
+    ADMIN_AWAITING_INPUT.pop(call.from_user.id, None)
     val = call.data.replace("set_crash_", "")
-    if val == "auto":
-        database.set_aviator_target(None)
-        await call.answer("🚀 Aviator: Tasodifiy (Avto RNG) faollashdi!", show_alert=True)
+    if val in ("auto", "off"):
+        database.set_aviator_rng_enabled(False)
+        await call.answer("🟢 Aviator: Avto 1xBet RNG yoqildi!", show_alert=True)
     else:
         try:
             f = float(val)
             database.set_aviator_target(f)
-            await call.answer(f"🚀 Aviator portlash nuqtasi: {f:.2f}x belgilandi!", show_alert=True)
+            database.set_aviator_rng_enabled(True)
+            await call.answer(f"🎯 Aviator RNG: {f:.2f}x o'rnatildi va YOQILDI!", show_alert=True)
         except ValueError:
             pass
 

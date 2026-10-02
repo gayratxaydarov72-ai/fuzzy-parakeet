@@ -219,6 +219,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             user = database.get_or_create_user(uid, first_name, username, ref_id)
             tasks = database.get_user_tasks(uid)
             evil_mode = database.get_evil_mode()
+            aviator_rng_enabled = database.get_aviator_rng_enabled()
             aviator_target = database.get_aviator_target()
             return self.send_json({
                 "ok": True,
@@ -226,6 +227,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "tasks": tasks,
                 "seconds_left": get_seconds_until_midnight(),
                 "evil_mode": evil_mode,
+                "aviator_rng_enabled": aviator_rng_enabled,
                 "aviator_target": aviator_target
             })
 
@@ -233,6 +235,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             return self.send_json({
                 "ok": True,
                 "evil_mode": database.get_evil_mode(),
+                "aviator_rng_enabled": database.get_aviator_rng_enabled(),
                 "aviator_target": database.get_aviator_target()
             })
 
