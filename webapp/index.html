@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NVINDIA GAMES - Mini App Portal</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container" id="app">
+    <canvas id="fx-canvas"></canvas>
+    <div class="toast-msg" id="toastMsg"></div>
+
+    <header class="top-nav">
+      <div class="logo-area" id="homeLogoBtn">
+        <span class="one-x">NVINDIA</span><span class="games-txt">GAMES</span>
+      </div>
+
+      <div class="balance-container">
+        <span class="balance-title">BALANS:</span>
+        <span class="balance-val"><span id="balanceAmount">50 000</span> <small>UZS</small></span>
+        <button class="topup-btn" id="topupBtn" title="Hisobni to'ldirish">+</button>
+      </div>
+
+      <div class="nav-controls">
+        <button class="icon-btn" id="soundToggle" title="Ovoz">🔊</button>
+        <button class="icon-btn" id="bgmToggle" title="Saundtrek Musiqa">🎵</button>
+        <button class="icon-btn" id="provablyBtn" title="SHA-256 Adolat">🛡️</button>
+      </div>
+    </header>
+
+    <nav class="main-tabs">
+      <button class="tab-btn active" data-tab="lobby">🎮 O'yinlar</button>
+      <button class="tab-btn" data-tab="tasks">🎯 Vazifalar <span class="badge" id="tasksBadge">1</span></button>
+      <button class="tab-btn" data-tab="referral">👥 Referal (+5K)</button>
+      <button class="tab-btn" data-tab="promo">🎁 Promokod</button>
+    </nav>
+
+    <div class="tab-content active" id="tab-lobby">
+      <div class="hero-banner">
+        <div class="banner-tag">🔥 AKSIYA</div>
+        <div class="banner-title">DO'STINGIZNI TAKLIF QILING!</div>
+        <div class="banner-desc">Har bir do'stingiz uchun hisobingizga <b>+5 000 UZS</b> olasiz!</div>
+        <button class="banner-action" id="bannerRefBtn">Havolani olish ➔</button>
+      </div>
+
+      <div class="games-catalog-title">OMMABOP NVINDIA GAMES O'YINLARI</div>
+
+      <div class="games-grid">
+        <div class="game-card" data-game="kamikaze">
+          <div class="game-thumb kamikaze-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><linearGradient id="gJet" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#38ef7d"/><stop offset="100%" stop-color="#11998e"/></linearGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(56,239,125,0.12)" stroke="rgba(56,239,125,0.4)" stroke-width="1.2"/><path d="M18 5 L23 15 L31 17 L24 20 L23 28 L18 24 L13 28 L12 20 L5 17 L13 15 Z" fill="url(#gJet)"/><circle cx="18" cy="18" r="2.5" fill="#ffffff"/></svg></span>
+            <span class="rt-tag">x9.24+</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">KAMIKAZE</div>
+            <div class="g-sub">10 qavatli samolyot minorasi</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="apple">
+          <div class="game-thumb apple-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><radialGradient id="gApple" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#ff6b81"/><stop offset="40%" stop-color="#ee5253"/><stop offset="85%" stop-color="#b31217"/><stop offset="100%" stop-color="#560004"/></radialGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(255,107,129,0.12)" stroke="rgba(255,107,129,0.4)" stroke-width="1.2"/><path d="M17 8 Q19 2 23 1" stroke="#8d6e63" stroke-width="2" fill="none"/><path d="M19 4 Q27 2 28 7 Q23 9 19 4 Z" fill="#2ed573"/><path d="M18 9 C15 5, 7 6, 7 15 C7 25, 14 31, 18 31 C22 31, 29 25, 29 15 C29 6, 21 5, 18 9 Z" fill="url(#gApple)"/><ellipse cx="14" cy="14" rx="3" ry="5.5" transform="rotate(-25 14 14)" fill="#ffffff" opacity="0.4"/></svg></span>
+            <span class="rt-tag">x349.5</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">APPLE OF FORTUNE</div>
+            <div class="g-sub">Oltin olmalar va zaharli minalar</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="crash">
+          <div class="game-thumb crash-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><linearGradient id="gCrash" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff4757"/><stop offset="100%" stop-color="#c0392b"/></linearGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(255,71,87,0.12)" stroke="rgba(255,71,87,0.4)" stroke-width="1.2"/><path d="M30 18 L16 10 L12 13 L17 18 L7 18 L5 21 L10 21 L16 19 L11 23 L15 26 Z" fill="url(#gCrash)"/><circle cx="23" cy="18" r="2" fill="#00f0ff"/></svg></span>
+            <span class="rt-tag">LIVE CRASH</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">AVIATOR / CRASH</div>
+            <div class="g-sub">Real vaqtda uchuvchi reaktiv samolyot</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="mines">
+          <div class="game-thumb mines-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><linearGradient id="gDiamond" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00f2fe"/><stop offset="100%" stop-color="#4facfe"/></linearGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(0,242,254,0.12)" stroke="rgba(0,242,254,0.4)" stroke-width="1.2"/><polygon points="18,6 28,14 18,30 8,14" fill="url(#gDiamond)"/><polygon points="18,10 24,14 18,25 12,14" fill="#ffffff" opacity="0.45"/><circle cx="18" cy="18" r="2" fill="#fff"/></svg></span>
+            <span class="rt-tag">x24.0+</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">MINES</div>
+            <div class="g-sub">5x5 brilliantlar va yashirin minalar</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="thimbles">
+          <div class="game-thumb thimbles-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><linearGradient id="gCup" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#b8860b"/><stop offset="50%" stop-color="#ffd700"/><stop offset="100%" stop-color="#8b6508"/></linearGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.4)" stroke-width="1.2"/><path d="M11 26 L14 10 L22 10 L25 26 Z" fill="url(#gCup)"/><ellipse cx="18" cy="10" rx="4" ry="2" fill="#ffeaa7"/><ellipse cx="18" cy="26" rx="7" ry="2.5" fill="#a67c1e"/><circle cx="18" cy="20" r="2.5" fill="#e74c3c"/></svg></span>
+            <span class="rt-tag">x2.91</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">THIMBLES</div>
+            <div class="g-sub">3 ta aylanuvchi oltin kosachalar</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="dice">
+          <div class="game-thumb dice-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><linearGradient id="gDice" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff7675"/><stop offset="100%" stop-color="#d63031"/></linearGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(255,118,117,0.12)" stroke="rgba(255,118,117,0.4)" stroke-width="1.2"/><rect x="8" y="9" width="18" height="18" rx="4" fill="url(#gDice)" transform="rotate(12 17 18)"/><circle cx="14" cy="15" r="1.5" fill="#fff"/><circle cx="20" cy="21" r="1.5" fill="#fff"/><circle cx="17" cy="18" r="1.5" fill="#fff"/></svg></span>
+            <span class="rt-tag">x5.80</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">UNDER / OVER 7</div>
+            <div class="g-sub">3D suyaklar va 7 dan katta/kichik</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena-view" id="view-kamikaze" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromKamikaze">⬅ Orqaga</button>
+        <span class="arena-title">KAMIKAZE TOWER</span>
+        <div class="mines-pills">
+          <button class="pill active" data-km="1">1 Bomba</button>
+          <button class="pill" data-km="2">2 Bomba</button>
+          <button class="pill" data-km="3">3 Bomba</button>
+        </div>
+      </div>
+      <div class="tower-scroll-area">
+        <div class="tower-board" id="kamikazeBoard"></div>
+      </div>
+      <div class="arena-footer">
+        <div class="cashout-box" id="kmCashoutBox" style="display: none;">
+          <button class="btn-cashout" id="kmCashoutBtn" disabled>
+            <span class="c-title">YUTUQNI OLISH</span>
+            <span class="c-sum" id="kmCashoutSum">0 UZS</span>
+          </button>
+        </div>
+        <div class="betting-box" id="kmBettingBox">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="kmMinus">-</button>
+              <input type="number" id="kmBetInput" value="5000" min="1000" step="1000">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="kmPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="kmHalf">/2</button>
+            <button class="btn-b-mod" id="kmDouble">x2</button>
+            <button class="btn-b-mod" id="kmMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game" id="kmStartBtn">STAVKA QILISH</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena-view" id="view-apple" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromApple">⬅ Orqaga</button>
+        <span class="arena-title">APPLE OF FORTUNE</span>
+        <span class="max-badge">MAX: 349.5x</span>
+      </div>
+      <div class="tower-scroll-area">
+        <div class="tower-board" id="appleBoard"></div>
+      </div>
+      <div class="arena-footer">
+        <div class="cashout-box" id="appleCashoutBox" style="display: none;">
+          <button class="btn-cashout" id="appleCashoutBtn" disabled>
+            <span class="c-title">YUTUQNI OLISH</span>
+            <span class="c-sum" id="appleCashoutSum">0 UZS</span>
+          </button>
+        </div>
+        <div class="betting-box" id="appleBettingBox">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="apMinus">-</button>
+              <input type="number" id="apBetInput" value="5000" min="1000" step="1000">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="apPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="apHalf">/2</button>
+            <button class="btn-b-mod" id="apDouble">x2</button>
+            <button class="btn-b-mod" id="apMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game btn-play-apple" id="apStartBtn">STAVKA QILISH</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena-view" id="view-crash" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromCrash">⬅ Orqaga</button>
+        <span class="arena-title">AVIATOR CRASH</span>
+        <div class="crash-status-pill" id="crashStateBadge">KUTILMOQDA</div>
+      </div>
+      <div class="crash-canvas-area">
+        <canvas id="crashCanvas"></canvas>
+        <div class="crash-multiplier-center" id="crashMultText">1.00x</div>
+      </div>
+      <div class="arena-footer">
+        <div class="crash-control-panel">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="crMinus">-</button>
+              <input type="number" id="crBetInput" value="5000" min="1000" step="1000">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="crPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="crHalf">/2</button>
+            <button class="btn-b-mod" id="crDouble">x2</button>
+            <button class="btn-b-mod" id="crMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-crash-action btn-ready" id="crashActionBtn">STAVKA QILISH</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena-view" id="view-mines" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromMines">⬅ Orqaga</button>
+        <span class="arena-title">MINES NVINDIA</span>
+        <div class="mines-mult-badge" id="minesMultBadge">x1.00</div>
+      </div>
+      <div class="mines-info-bar">
+        <div class="mines-info-col">
+          <span class="m-lbl">Minalar soni:</span>
+          <span class="m-val" id="minesCountDisplay">3</span>
+        </div>
+        <div class="mines-info-col">
+          <span class="m-lbl">Keyingi ko'paytma:</span>
+          <span class="m-val-green" id="minesNextMultDisplay">x1.18</span>
+        </div>
+      </div>
+      <div class="mines-board-wrap">
+        <div class="mines-board" id="minesBoard"></div>
+      </div>
+      <div class="arena-footer">
+        <div class="cashout-box" id="minesCashoutBox" style="display: none;">
+          <button class="btn-cashout" id="minesCashoutBtn" disabled>
+            <span class="c-title">YUTUQNI OLISH</span>
+            <span class="c-sum" id="minesCashoutSum">0 UZS</span>
+          </button>
+        </div>
+        <div class="betting-box" id="minesBettingBox">
+          <div class="mines-trap-selector">
+            <span class="b-lbl">Minalar:</span>
+            <div class="trap-buttons">
+              <button class="btn-trap" data-mines="1">1</button>
+              <button class="btn-trap active" data-mines="3">3</button>
+              <button class="btn-trap" data-mines="5">5</button>
+              <button class="btn-trap" data-mines="10">10</button>
+              <button class="btn-trap" data-mines="15">15</button>
+              <button class="btn-trap" data-mines="20">20</button>
+            </div>
+          </div>
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="mnMinus">-</button>
+              <input type="number" id="mnBetInput" value="5000" min="1000" step="1000">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="mnPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="mnHalf">/2</button>
+            <button class="btn-b-mod" id="mnDouble">x2</button>
+            <button class="btn-b-mod" id="mnMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game" id="mnStartBtn">STAVKA QILISH</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena-view" id="view-thimbles" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromThimbles">⬅ Orqaga</button>
+        <span class="arena-title">THIMBLES NVINDIA</span>
+        <div class="thimbles-mode-badge" id="thimblesModeBadge">x2.91</div>
+      </div>
+      <div class="thimbles-stage-wrap">
+        <div class="thimbles-message" id="thimblesMsg">Stavka qiling va stakanlardan birini tanlang</div>
+        <div class="thimbles-stage" id="thimblesStage">
+          <div class="thimble-slot" data-index="0" id="cup0">
+            <div class="thimble-cup">
+              <svg viewBox="0 0 100 110" class="cup-svg">
+                <defs>
+                  <linearGradient id="cupGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#8a6114"/>
+                    <stop offset="25%" stop-color="#ffd54f"/>
+                    <stop offset="50%" stop-color="#fff8e1"/>
+                    <stop offset="75%" stop-color="#ffb300"/>
+                    <stop offset="100%" stop-color="#6d4c0f"/>
+                  </linearGradient>
+                </defs>
+                <ellipse cx="50" cy="18" rx="28" ry="8" fill="#ffecb3" stroke="#8a6114" stroke-width="2"/>
+                <path d="M22 18 L32 96 Q50 102 68 96 L78 18 Z" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="2"/>
+                <ellipse cx="50" cy="95" rx="18" ry="5" fill="#ffd54f"/>
+                <circle cx="50" cy="10" r="7" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div class="thimble-ball" id="ball0"></div>
+          </div>
+          <div class="thimble-slot" data-index="1" id="cup1">
+            <div class="thimble-cup">
+              <svg viewBox="0 0 100 110" class="cup-svg">
+                <ellipse cx="50" cy="18" rx="28" ry="8" fill="#ffecb3" stroke="#8a6114" stroke-width="2"/>
+                <path d="M22 18 L32 96 Q50 102 68 96 L78 18 Z" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="2"/>
+                <ellipse cx="50" cy="95" rx="18" ry="5" fill="#ffd54f"/>
+                <circle cx="50" cy="10" r="7" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div class="thimble-ball" id="ball1"></div>
+          </div>
+          <div class="thimble-slot" data-index="2" id="cup2">
+            <div class="thimble-cup">
+              <svg viewBox="0 0 100 110" class="cup-svg">
+                <ellipse cx="50" cy="18" rx="28" ry="8" fill="#ffecb3" stroke="#8a6114" stroke-width="2"/>
+                <path d="M22 18 L32 96 Q50 102 68 96 L78 18 Z" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="2"/>
+                <ellipse cx="50" cy="95" rx="18" ry="5" fill="#ffd54f"/>
+                <circle cx="50" cy="10" r="7" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div class="thimble-ball" id="ball2"></div>
+          </div>
+        </div>
+      </div>
+      <div class="arena-footer">
+        <div class="betting-box" id="thimblesBettingBox">
+          <div class="thimbles-mode-selector">
+            <span class="b-lbl">Rejim:</span>
+            <div class="trap-buttons">
+              <button class="btn-trap active" id="thimMode1" data-mode="1">1 ta shar (x2.91)</button>
+              <button class="btn-trap" id="thimMode2" data-mode="2">2 ta shar (x1.45)</button>
+            </div>
+          </div>
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="thMinus">-</button>
+              <input type="number" id="thBetInput" value="5000" min="1000" step="1000">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="thPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="thHalf">/2</button>
+            <button class="btn-b-mod" id="thDouble">x2</button>
+            <button class="btn-b-mod" id="thMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game" id="thStartBtn">STAVKA QILISH</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena-view" id="view-dice" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromDice">⬅ Orqaga</button>
+        <span class="arena-title">UNDER / OVER 7</span>
+        <div class="dice-status-badge" id="diceStatusBadge">SUM: ?</div>
+      </div>
+      <div class="dice-stage-wrap">
+        <div class="dice-sum-display" id="diceSumTotal">?</div>
+        <div class="dice-table" id="diceTable">
+          <div class="dice-cube" id="diceCube1" data-val="1">
+            <div class="dice-pip-grid" id="dicePips1"></div>
+          </div>
+          <div class="dice-cube" id="diceCube2" data-val="6">
+            <div class="dice-pip-grid" id="dicePips2"></div>
+          </div>
+        </div>
+        <div class="dice-choice-group">
+          <button class="dice-btn-choice" id="choiceUnder" data-choice="under">
+            <span class="dc-icon">🔻</span>
+            <span class="dc-title">7 DAN KAM</span>
+            <span class="dc-rate">x2.30</span>
+          </button>
+          <button class="dice-btn-choice active" id="choiceExact" data-choice="exact">
+            <span class="dc-icon">🎯</span>
+            <span class="dc-title">7 GA TENG</span>
+            <span class="dc-rate">x5.80</span>
+          </button>
+          <button class="dice-btn-choice" id="choiceOver" data-choice="over">
+            <span class="dc-icon">🔺</span>
+            <span class="dc-title">7 DAN KO'P</span>
+            <span class="dc-rate">x2.30</span>
+          </button>
+        </div>
+      </div>
+      <div class="arena-footer">
+        <div class="betting-box" id="diceBettingBox">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="dcMinus">-</button>
+              <input type="number" id="dcBetInput" value="5000" min="1000" step="1000">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="dcPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="dcHalf">/2</button>
+            <button class="btn-b-mod" id="dcDouble">x2</button>
+            <button class="btn-b-mod" id="dcMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game" id="diceRollBtn">TOSHLARNI TASHLASH</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-tasks">
+      <div class="section-card">
+        <div class="sec-title">🎯 KUNLIK VAZIFALAR</div>
+        <div class="sec-desc">Vazifalarni bajaring va har kuni qo'shimcha bepul balans yig'ing!</div>
+        <div class="tasks-list" id="tasksList"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-referral">
+      <div class="section-card">
+        <div class="sec-title">👥 DO'STLARNI TAKLIF QILISH</div>
+        <div class="sec-desc">Pulingiz tugadimi? Do'stlaringizni taklif qiling va har biri uchun <b>+5 000 UZS</b> oling!</div>
+        
+        <div class="ref-stats-grid">
+          <div class="stat-box">
+            <span class="s-val" id="refCount">0</span>
+            <span class="s-lbl">Taklif qilingan</span>
+          </div>
+          <div class="stat-box">
+            <span class="s-val" id="refTotal">0 UZS</span>
+            <span class="s-lbl">Jami yutilgan</span>
+          </div>
+        </div>
+
+        <div class="ref-link-box">
+          <span class="ref-link-title">Sizning taklif havolangiz:</span>
+          <div class="ref-input-group">
+            <input type="text" id="refLinkInput" readonly value="https://t.me/xBauntyBot?start=ref_0">
+            <button class="copy-btn" id="copyRefBtn">Nusxa</button>
+          </div>
+        </div>
+
+        <button class="share-tg-btn" id="shareTgBtn">Telegramda ulashish (+5K)</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-promo">
+      <div class="section-card">
+        <div class="sec-title">🎁 PROMOKOD FAOLLASHTIRISH</div>
+        <div class="sec-desc">Telegram kanalimizdagi yoki admindan olgan promokodlarni kiriting va balansingizni to'ldiring!</div>
+
+        <div class="promo-box">
+          <input type="text" id="promoInput" placeholder="Masalan: NVINDIA">
+          <button class="promo-btn" id="promoSubmitBtn">FAOLLASHTIRISH</button>
+        </div>
+
+        <div class="promo-hints">
+          <span class="hint-title">Mashhur promokodlar:</span>
+          <div class="hint-tags">
+            <span class="tag" data-code="NVINDIA">NVINDIA (+25 000 UZS)</span>
+            <span class="tag" data-code="NVIDIA">NVIDIA (+20 000 UZS)</span>
+            <span class="tag" data-code="MINES">MINES (+20 000 UZS)</span>
+            <span class="tag" data-code="KAMIKAZE">KAMIKAZE (+20 000 UZS)</span>
+            <span class="tag" data-code="1XBET">1XBET (+15 000 UZS)</span>
+            <span class="tag" data-code="DICE">DICE (+15 000 UZS)</span>
+            <span class="tag" data-code="APPLE">APPLE (+10 000 UZS)</span>
+            <span class="tag" data-code="BONUS5000">BONUS5000 (+5 000 UZS)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="provablyModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <span>🛡️ ADOLATLI RNG (PROVABLY FAIR)</span>
+          <button class="modal-close" id="closeProvablyBtn">&times;</button>
+        </div>
+        <div class="modal-body-scroll">
+          <p class="pv-desc">NVINDIA GAMES algoritmi kriptografik SHA-256 xeshidan foydalanadi. O'yin natijalari server yoki o'yinchi tomonidan o'zgartirilishi mumkin emas!</p>
+          <div class="pv-hash-box">
+            <span class="pv-lbl">So'nggi o'yin xeshi (SHA-256):</span>
+            <div class="pv-hash-val" id="lastProvablyHash">Kutilmoqda...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-backdrop" id="resultOverlay">
+      <div class="result-box" id="resultBox">
+        <div class="result-ico" id="resultIcon">💥</div>
+        <div class="result-head" id="resultTitle">PORTLASH!</div>
+        <div class="result-msg" id="resultDesc">Samolyot minaga urildi</div>
+        <div class="result-score" id="resultAmount">-5 000 UZS</div>
+        <button class="btn-retry" id="continueBtn">DAVOM ETISH</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
