@@ -11,20 +11,29 @@ if (tg) {
   } catch (e) {}
 }
 
+let crashCanvas = null;
+let crashCtx = null;
+
 function syncViewportHeight() {
   const vh = window.innerHeight * 0.01;
   document.documentElement.style.setProperty('--vh', `${vh}px`);
   try {
     tg?.expand?.();
   } catch (e) {}
-  if (typeof crashCanvas !== "undefined" && crashCanvas && crashCanvas.parentElement) {
-    crashCanvas.width = crashCanvas.parentElement.clientWidth;
-    crashCanvas.height = crashCanvas.parentElement.clientHeight;
+  const cc = document.getElementById("crashCanvas");
+  if (cc && cc.parentElement) {
+    cc.width = cc.parentElement.clientWidth;
+    cc.height = cc.parentElement.clientHeight;
   }
 }
 window.addEventListener("resize", syncViewportHeight);
 window.addEventListener("orientationchange", syncViewportHeight);
 syncViewportHeight();
+
+const safeStorage = {
+  getItem: (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } },
+  setItem: (k, v) => { try { localStorage.setItem(k, String(v)); } catch(e) {} }
+};
 
 const urlParams = new URLSearchParams(window.location.search);
 let initialUid = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
@@ -32,12 +41,12 @@ if (!initialUid || isNaN(parseInt(initialUid, 10))) {
   initialUid = urlParams.get("uid");
 }
 if (!initialUid || initialUid === "undefined" || initialUid === "null" || isNaN(parseInt(initialUid, 10))) {
-  initialUid = localStorage.getItem("nv_user_id");
+  initialUid = safeStorage.getItem("nv_user_id");
 }
 if (!initialUid || isNaN(parseInt(initialUid, 10))) {
   initialUid = "999999";
 }
-localStorage.setItem("nv_user_id", String(initialUid));
+safeStorage.setItem("nv_user_id", String(initialUid));
 const USER_ID = parseInt(initialUid, 10);
 const FIRST_NAME = tg?.initDataUnsafe?.user?.first_name || urlParams.get("name") || "O'yinchi";
 const USERNAME = tg?.initDataUnsafe?.user?.username || urlParams.get("user") || "";
@@ -66,7 +75,7 @@ const APPLE_MINES_PER_ROW = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4];
 const appState = {
   balance: 10000,
   user: null,
-  sound: localStorage.getItem("one_sound") !== "false",
+  sound: safeStorage.getItem("one_sound") !== "false",
   lastHash: "SHA-256 Kripto himoya yoqilgan",
   evilMode: false,
   aviatorRngEnabled: false,
@@ -398,8 +407,10 @@ class ParticleFX {
   }
 
   resize() {
-    this.canvas.width = this.canvas.parentElement.clientWidth;
-    this.canvas.height = this.canvas.parentElement.clientHeight;
+    if (this.canvas && this.canvas.parentElement) {
+      this.canvas.width = this.canvas.parentElement.clientWidth;
+      this.canvas.height = this.canvas.parentElement.clientHeight;
+    }
   }
 
   explode(x, y) {
@@ -469,7 +480,7 @@ function formatMoney(n) {
 
 (function restoreCachedBalance() {
   try {
-    const cached = localStorage.getItem("nv_cached_balance");
+    const cached = safeStorage.getItem("nv_cached_balance");
     if (cached !== null && !isNaN(parseInt(cached, 10))) {
       const bVal = parseInt(cached, 10);
       appState.balance = bVal;
@@ -508,7 +519,7 @@ function updateBalanceUI(val, animate = true) {
   appState.balance = val;
 
   try {
-    localStorage.setItem("nv_cached_balance", String(val));
+    safeStorage.setItem("nv_cached_balance", String(val));
   } catch (e) {}
 
   if (balanceAnimId) {
@@ -1482,12 +1493,14 @@ document.getElementById("apMax").addEventListener("click", () => {
   adjustBetInput("apBetInput", "max");
 });
 
-let crashCanvas, crashCtx;
 function initCrashCanvas() {
   crashCanvas = document.getElementById("crashCanvas");
+  if (!crashCanvas) return;
   crashCtx = crashCanvas.getContext("2d");
-  crashCanvas.width = crashCanvas.parentElement.clientWidth;
-  crashCanvas.height = crashCanvas.parentElement.clientHeight;
+  if (crashCanvas.parentElement) {
+    crashCanvas.width = crashCanvas.parentElement.clientWidth;
+    crashCanvas.height = crashCanvas.parentElement.clientHeight;
+  }
   cancelAnimationFrame(appState.cr.animId);
   appState.cr.animId = requestAnimationFrame(crashLoop);
 }
@@ -2109,7 +2122,7 @@ if (heroBanner) {
 
 document.getElementById("soundToggle").addEventListener("click", () => {
   appState.sound = !appState.sound;
-  localStorage.setItem("one_sound", appState.sound.toString());
+  safeStorage.setItem("one_sound", appState.sound.toString());
   document.getElementById("soundToggle").textContent = appState.sound ? "🔊" : "🔇";
   triggerHaptic("light");
 });
