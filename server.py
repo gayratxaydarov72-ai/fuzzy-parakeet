@@ -280,11 +280,39 @@ class AviatorLiveRoom:
         self.thread.start()
 
     def populate_simulated_bets(self):
-        count = random.randint(4, 7)
-        picked = random.sample(self.simulated_users, count)
+        real_db_users = database.get_recent_telegram_users(limit=25)
         amounts = [2000, 5000, 10000, 25000, 50000, 100000]
+        
+        available = []
+        if real_db_users:
+            for ru in real_db_users:
+                uname = (ru.get("username") or "").strip()
+                fname = (ru.get("first_name") or "").strip()
+                if uname or fname:
+                    available.append({
+                        "user_id": ru["user_id"],
+                        "name": fname or uname,
+                        "username": uname
+                    })
+        
+        if len(available) < 4:
+            fallback = [
+                {"user_id": 9901, "name": "Jasur", "username": "jasur_crypto"},
+                {"user_id": 9902, "name": "Azamat", "username": "azamat_uzb"},
+                {"user_id": 9903, "name": "Farrux", "username": "farrux_bek"},
+                {"user_id": 9904, "name": "Bekzod", "username": "bekzod_01"},
+                {"user_id": 9905, "name": "Malika", "username": "malika_star"},
+                {"user_id": 9906, "name": "Islom", "username": "islom_trader"},
+                {"user_id": 9907, "name": "Otabek", "username": "otabek_77"}
+            ]
+            for fb in fallback:
+                if not any(a["user_id"] == fb["user_id"] for a in available):
+                    available.append(fb)
+                    
+        count = min(len(available), random.randint(4, 7))
+        picked = random.sample(available, count)
         for u in picked:
-            target = round(random.uniform(1.25, 3.50), 2)
+            target = round(random.uniform(1.20, 3.80), 2)
             amt = random.choice(amounts)
             self.bets[u["user_id"]] = {
                 "user_id": u["user_id"],
@@ -456,6 +484,8 @@ class AviatorLiveRoom:
                 "phase": self.phase,
                 "time_left": time_left,
                 "total_time": self.total_phase_duration,
+                "flight_start_time": self.flight_start_time,
+                "server_time": now,
                 "multiplier": self.current_mult,
                 "crash_point": self.crash_point if self.phase == "crashed" else None,
                 "history": self.history,

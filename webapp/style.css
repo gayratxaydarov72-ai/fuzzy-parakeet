@@ -2444,22 +2444,38 @@ button, input, select, textarea {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: clamp(48px, 12vw, 60px);
-  height: clamp(48px, 12vw, 60px);
+  width: clamp(52px, 14vw, 64px);
+  height: clamp(52px, 14vw, 64px);
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff1b8 0%, #ffd700 40%, #b8860b 80%, #684803 100%);
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.8), inset 0 2px 4px rgba(255, 255, 255, 0.8), 0 0 10px rgba(255, 215, 0, 0.5);
+  background: radial-gradient(circle at 35% 30%, #fff4be 0%, #ffd700 45%, #b8860b 80%, #573c02 100%);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.9), inset 0 2px 5px rgba(255, 255, 255, 0.8), 0 0 12px rgba(255, 215, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 8;
   cursor: pointer;
-  border: 2px solid #5a3c05;
+  border: 3px solid #3d2700;
 }
 
-.cap-gem {
-  font-size: clamp(18px, 4.5vw, 24px);
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+.cap-inner {
+  width: 76%;
+  height: 76%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2c3e50 0%, #0a1118 100%);
+  border: 1.5px solid #ffd700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.cap-logo {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 900;
+  color: #ffd700;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
 }
 
 .wheel-result-msg {
@@ -2496,117 +2512,54 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   🪙 COIN FLIP DUEL (ONLINE & OFFLINE) STYLES
+   🪙 ULTRA-PREMIUM 3D COIN FLIP (SOLO CASINO) STYLES
    ========================================================================== */
+.cf-mult-badge {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 900;
+  color: #ffd700;
+  background: rgba(241, 196, 15, 0.15);
+  border: 1.2px solid rgba(241, 196, 15, 0.5);
+  padding: 3px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+}
+
 .cf-stage-container {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 6px 12px;
-  background: radial-gradient(circle at 50% 30%, #1c2738 0%, #0a111a 100%);
-  gap: clamp(6px, 1.2vh, 10px);
+  background: radial-gradient(circle at 50% 30%, #172436 0%, #090f18 100%);
+  gap: clamp(8px, 1.5vh, 14px);
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-.cf-mode-toggle {
-  display: flex;
-  background: rgba(10, 18, 28, 0.8);
-  border: 1px solid #233b58;
-  border-radius: 18px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.cf-tab-btn {
-  background: transparent;
-  border: none;
-  color: #7d96b3;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.cf-tab-btn.active {
-  background: linear-gradient(135deg, #f1c40f, #e67e22);
-  color: #1a1002;
-  box-shadow: 0 0 8px rgba(241, 196, 15, 0.4);
-}
-
-.cf-online-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(13, 25, 40, 0.7);
-  border: 1px solid #1f3a5a;
-  border-radius: 10px;
-  padding: 4px 10px;
-  font-size: 11px;
-}
-
-.cf-round-tag {
-  font-weight: 800;
-  color: #7bed9f;
-}
-
-.cf-timer-pill {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #e74c3c;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-family: var(--font-heading);
-  font-weight: 800;
-  color: #ff6b81;
-  font-size: 12px;
-}
-
-.cf-timer-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ff4757;
-  animation: pulse-dot 1s infinite alternate;
-}
-
-@keyframes pulse-dot {
-  0% { opacity: 0.4; transform: scale(0.8); }
-  100% { opacity: 1; transform: scale(1.2); }
-}
-
-.cf-phase-text {
-  font-weight: 700;
-  color: #f1c40f;
-  font-size: 10px;
-  text-transform: uppercase;
 }
 
 .cf-history-strip {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 28px;
 }
 
 .cf-h-badge {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  border: 1px solid #d4ac0d;
+  font-size: 14px;
+  border: 1.5px solid #d4ac0d;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .cf-h-badge.heads {
-  background: linear-gradient(135deg, #f1c40f, #b8860b);
+  background: linear-gradient(135deg, #ffd700, #b8860b);
 }
 
 .cf-h-badge.tails {
@@ -2618,17 +2571,18 @@ button, input, select, textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 0;
-  perspective: 1000px;
+  padding: 10px 0 4px;
+  position: relative;
 }
 
 .cf-coin-wrapper {
-  width: 110px;
-  height: 110px;
+  width: 140px;
+  height: 140px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  perspective: 1200px;
 }
 
 .cf-3d-coin {
@@ -2636,8 +2590,34 @@ button, input, select, textarea {
   height: 100%;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 3s cubic-bezier(0.18, 0.9, 0.28, 1);
   border-radius: 50%;
+  transform: rotateY(0deg);
+}
+
+.cf-3d-coin.flipping-heads {
+  animation: coin-flip-to-heads 2.8s cubic-bezier(0.15, 0.85, 0.25, 1) forwards;
+}
+
+.cf-3d-coin.flipping-tails {
+  animation: coin-flip-to-tails 2.8s cubic-bezier(0.15, 0.85, 0.25, 1) forwards;
+}
+
+@keyframes coin-flip-to-heads {
+  0% { transform: translateY(0) scale(1) rotateY(0deg) rotateX(0deg); }
+  35% { transform: translateY(-135px) scale(1.18) rotateY(1440deg) rotateX(25deg); }
+  65% { transform: translateY(-40px) scale(1.06) rotateY(2160deg) rotateX(12deg); }
+  85% { transform: translateY(6px) scale(0.97) rotateY(2700deg) rotateX(-5deg); }
+  94% { transform: translateY(-3px) scale(1.02) rotateY(2880deg) rotateX(2deg); }
+  100% { transform: translateY(0) scale(1) rotateY(2880deg) rotateX(0deg); }
+}
+
+@keyframes coin-flip-to-tails {
+  0% { transform: translateY(0) scale(1) rotateY(180deg) rotateX(0deg); }
+  35% { transform: translateY(-135px) scale(1.18) rotateY(1620deg) rotateX(25deg); }
+  65% { transform: translateY(-40px) scale(1.06) rotateY(2340deg) rotateX(12deg); }
+  85% { transform: translateY(6px) scale(0.97) rotateY(2880deg) rotateX(-5deg); }
+  94% { transform: translateY(-3px) scale(1.02) rotateY(3060deg) rotateX(2deg); }
+  100% { transform: translateY(0) scale(1) rotateY(3060deg) rotateX(0deg); }
 }
 
 .cf-coin-face {
@@ -2650,53 +2630,37 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), inset 0 2px 5px rgba(255, 255, 255, 0.8), inset 0 -4px 6px rgba(0, 0, 0, 0.4);
-  border: 3.5px solid #ffd700;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.75), inset 0 2px 4px rgba(255, 255, 255, 0.7);
 }
 
 .cf-coin-heads {
-  background: radial-gradient(circle at 35% 35%, #fff1a8 0%, #f1c40f 45%, #b8860b 85%, #6e4d03 100%);
   transform: rotateY(0deg);
 }
 
 .cf-coin-tails {
-  background: radial-gradient(circle at 35% 35%, #fff1a8 0%, #e67e22 45%, #b8860b 85%, #6e4d03 100%);
   transform: rotateY(180deg);
 }
 
-.cf-face-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed rgba(255, 255, 255, 0.45);
+.cf-coin-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
   border-radius: 50%;
-  width: 86%;
-  height: 86%;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5));
 }
 
-.cf-face-icon {
-  font-size: 28px;
-  line-height: 1;
+.cf-coin-shadow {
+  width: 100px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 75%);
+  margin-top: 8px;
+  transition: all 0.3s ease;
 }
 
-.cf-face-name {
-  font-family: var(--font-heading);
-  font-size: 11px;
-  font-weight: 900;
-  color: #2c1a02;
-  letter-spacing: 0.5px;
-}
-
-.cf-face-mult {
-  font-size: 9px;
-  font-weight: 800;
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 1px 5px;
-  border-radius: 8px;
-  margin-top: 2px;
+.cf-coin-stage.in-air .cf-coin-shadow {
+  transform: scale(0.4);
+  opacity: 0.2;
 }
 
 .cf-result-banner {
@@ -2704,9 +2668,9 @@ button, input, select, textarea {
   font-weight: 700;
   color: #8da4be;
   text-align: center;
-  min-height: 22px;
-  margin-top: 6px;
-  transition: all 0.2s;
+  min-height: 24px;
+  margin-top: 8px;
+  transition: all 0.25s ease;
 }
 
 .cf-result-banner.win {
@@ -2724,42 +2688,51 @@ button, input, select, textarea {
 .cf-choice-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cf-side-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: rgba(14, 27, 43, 0.8);
+  gap: 10px;
+  background: rgba(14, 27, 43, 0.85);
   border: 1.5px solid #234164;
-  border-radius: 12px;
-  padding: 8px 6px;
+  border-radius: 14px;
+  padding: 10px 12px;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.2s ease;
 }
 
 .cf-side-btn.active {
-  background: linear-gradient(135deg, rgba(241, 196, 15, 0.2), rgba(230, 126, 34, 0.25));
+  background: linear-gradient(135deg, rgba(241, 196, 15, 0.22), rgba(230, 126, 34, 0.28));
   border-color: #ffd700;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
   transform: translateY(-2px);
 }
 
-.cf-s-icon {
-  font-size: 22px;
+.cf-btn-badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cf-side-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .cf-s-name {
   font-family: var(--font-heading);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 900;
   color: #ffffff;
+  letter-spacing: 0.5px;
 }
 
 .cf-s-rate {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   color: #ffd700;
 }

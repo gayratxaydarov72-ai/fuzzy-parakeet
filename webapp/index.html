@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.6">
+  <link rel="stylesheet" href="style.css?v=3.7">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -542,7 +542,7 @@
           </div>
           <canvas id="wheelCanvas" width="340" height="340"></canvas>
           <div class="wheel-center-cap" id="wheelCenterCap">
-            <div class="cap-gem">💎</div>
+            <div class="cap-inner"><span class="cap-logo">NV</span></div>
           </div>
         </div>
         <div class="wheel-result-msg" id="wheelResultMsg">G'ildirakni aylantiring va omadingizni sinab ko'ring!</div>
@@ -576,75 +576,158 @@
     <div class="game-arena-view" id="view-coinflip" style="display: none;">
       <div class="arena-header">
         <button class="back-btn" id="backFromCoinflip">⬅ Orqaga</button>
-        <span class="arena-title">COIN FLIP DUEL</span>
-        <div class="cf-mode-toggle">
-          <button class="cf-tab-btn active" id="cfTabOnline" data-mode="online">🌐 ONLINE</button>
-          <button class="cf-tab-btn" id="cfTabOffline" data-mode="offline">🕹 OFFLINE</button>
-        </div>
+        <span class="arena-title">3D COIN FLIP</span>
+        <div class="cf-mult-badge">1.96x YUTUQ</div>
       </div>
       <div class="cf-stage-container">
-        <!-- Online Round Status Bar -->
-        <div class="cf-online-bar" id="cfOnlineBar">
-          <span class="cf-round-tag" id="cfRoundTag">RAUND #1001</span>
-          <div class="cf-timer-pill" id="cfTimerPill"><span class="cf-timer-dot"></span> <span id="cfTimerText">10.0s</span></div>
-          <span class="cf-phase-text" id="cfPhaseText">STAVKALAR QABUL QILINMOQDA</span>
-        </div>
-
         <!-- History Strip -->
         <div class="cf-history-strip" id="cfHistoryStrip">
-          <span class="cf-h-badge heads">🦅</span>
-          <span class="cf-h-badge tails">👑</span>
-          <span class="cf-h-badge heads">🦅</span>
-          <span class="cf-h-badge heads">🦅</span>
-          <span class="cf-h-badge tails">👑</span>
+          <span class="cf-h-badge heads" title="Burgut">🦅</span>
+          <span class="cf-h-badge tails" title="Gerb">👑</span>
+          <span class="cf-h-badge heads" title="Burgut">🦅</span>
+          <span class="cf-h-badge heads" title="Burgut">🦅</span>
+          <span class="cf-h-badge tails" title="Gerb">👑</span>
         </div>
 
-        <!-- 3D Coin Stage -->
+        <!-- Ultra-Realistic 3D Coin Stage -->
         <div class="cf-coin-stage">
           <div class="cf-coin-wrapper" id="cfCoinWrapper">
             <div class="cf-3d-coin" id="cf3dCoin">
+              <!-- HEADS: Golden Imperial Eagle -->
               <div class="cf-coin-face cf-coin-heads">
-                <div class="cf-face-inner">
-                  <div class="cf-face-icon">🦅</div>
-                  <div class="cf-face-name">BURGUT</div>
-                  <div class="cf-face-mult">x1.96</div>
-                </div>
+                <svg viewBox="0 0 160 160" class="cf-coin-svg">
+                  <defs>
+                    <radialGradient id="goldPlate" cx="40%" cy="35%" r="65%">
+                      <stop offset="0%" stop-color="#fff8db"/>
+                      <stop offset="35%" stop-color="#f5c518"/>
+                      <stop offset="70%" stop-color="#c99700"/>
+                      <stop offset="100%" stop-color="#6e4d00"/>
+                    </radialGradient>
+                    <radialGradient id="eagleGold" cx="50%" cy="40%" r="60%">
+                      <stop offset="0%" stop-color="#ffffff"/>
+                      <stop offset="40%" stop-color="#ffeaa7"/>
+                      <stop offset="100%" stop-color="#c99700"/>
+                    </radialGradient>
+                    <filter id="coinBevel">
+                      <feDropShadow dx="0" dy="1.5" stdDeviation="1" flood-color="#000000" flood-opacity="0.6"/>
+                    </filter>
+                  </defs>
+                  <!-- Outer milled rim -->
+                  <circle cx="80" cy="80" r="76" fill="url(#goldPlate)" stroke="#4d3200" stroke-width="2.5"/>
+                  <circle cx="80" cy="80" r="71" fill="none" stroke="#ffeaa7" stroke-width="1.8" stroke-dasharray="3 2"/>
+                  <circle cx="80" cy="80" r="67" fill="none" stroke="#8a6100" stroke-width="1"/>
+                  <!-- Inner disc -->
+                  <circle cx="80" cy="80" r="64" fill="url(#goldPlate)"/>
+                  
+                  <!-- Imperial Eagle Silhouette / Artwork -->
+                  <g filter="url(#coinBevel)" fill="url(#eagleGold)" stroke="#6e4d00" stroke-width="0.8">
+                    <!-- Eagle Body & Wings -->
+                    <path d="M80 34 L85 46 L95 40 L93 52 L107 48 L102 60 L118 60 L110 72 L124 76 L112 85 L120 95 L104 94 L100 106 L90 100 L86 112 L80 106 L74 112 L70 100 L60 106 L56 94 L40 95 L48 85 L36 76 L50 72 L42 60 L58 60 L53 48 L67 52 L65 40 L75 46 Z"/>
+                    <!-- Eagle Head Left -->
+                    <circle cx="75" cy="40" r="4.5"/>
+                    <path d="M72 39 L65 41 L72 43 Z" fill="#fff8db"/>
+                    <!-- Eagle Head Right -->
+                    <circle cx="85" cy="40" r="4.5"/>
+                    <path d="M88 39 L95 41 L88 43 Z" fill="#fff8db"/>
+                    <!-- Shield on breast -->
+                    <path d="M73 62 L87 62 L87 78 L80 85 L73 78 Z" fill="#ffffff" stroke="#8a6100" stroke-width="1.5"/>
+                    <polygon points="80,66 84,74 76,74" fill="#d63031"/>
+                  </g>
+                  
+                  <!-- Circular Inscription -->
+                  <text x="80" y="24" font-family="'Oswald', sans-serif" font-size="9" font-weight="900" fill="#4d3200" text-anchor="middle" letter-spacing="1">NVINDIA CASINO</text>
+                  <text x="80" y="138" font-family="'Oswald', sans-serif" font-size="10.5" font-weight="900" fill="#3b2600" text-anchor="middle" letter-spacing="1.5">★ BURGUT 1.96x ★</text>
+                </svg>
               </div>
+
+              <!-- TAILS: Royal Sovereign Crest / Crown -->
               <div class="cf-coin-face cf-coin-tails">
-                <div class="cf-face-inner">
-                  <div class="cf-face-icon">👑</div>
-                  <div class="cf-face-name">GERB</div>
-                  <div class="cf-face-mult">x1.96</div>
-                </div>
+                <svg viewBox="0 0 160 160" class="cf-coin-svg">
+                  <defs>
+                    <radialGradient id="silverPlate" cx="40%" cy="35%" r="65%">
+                      <stop offset="0%" stop-color="#fff8db"/>
+                      <stop offset="35%" stop-color="#e67e22"/>
+                      <stop offset="70%" stop-color="#b85900"/>
+                      <stop offset="100%" stop-color="#542500"/>
+                    </radialGradient>
+                    <radialGradient id="crownGold" cx="50%" cy="40%" r="60%">
+                      <stop offset="0%" stop-color="#ffffff"/>
+                      <stop offset="40%" stop-color="#fff1a8"/>
+                      <stop offset="100%" stop-color="#f39c12"/>
+                    </radialGradient>
+                  </defs>
+                  <!-- Outer milled rim -->
+                  <circle cx="80" cy="80" r="76" fill="url(#silverPlate)" stroke="#4d2200" stroke-width="2.5"/>
+                  <circle cx="80" cy="80" r="71" fill="none" stroke="#fff8db" stroke-width="1.8" stroke-dasharray="3 2"/>
+                  <circle cx="80" cy="80" r="67" fill="none" stroke="#783400" stroke-width="1"/>
+                  <!-- Inner disc -->
+                  <circle cx="80" cy="80" r="64" fill="url(#silverPlate)"/>
+                  
+                  <!-- Royal Imperial Crown & Heraldic Shield -->
+                  <g filter="url(#coinBevel)" fill="url(#crownGold)" stroke="#542500" stroke-width="0.8">
+                    <!-- Crown Base -->
+                    <rect x="52" y="78" width="56" height="12" rx="3"/>
+                    <circle cx="58" cy="84" r="2.5" fill="#e74c3c"/>
+                    <circle cx="70" cy="84" r="2.5" fill="#00cec9"/>
+                    <circle cx="80" cy="84" r="3" fill="#ffffff"/>
+                    <circle cx="90" cy="84" r="2.5" fill="#00cec9"/>
+                    <circle cx="102" cy="84" r="2.5" fill="#e74c3c"/>
+                    <!-- Crown Spikes -->
+                    <path d="M52 78 L50 56 L64 68 L80 48 L96 68 L110 56 L108 78 Z"/>
+                    <!-- Jewels on Spikes -->
+                    <circle cx="50" cy="54" r="3.5" fill="#ffffff"/>
+                    <circle cx="80" cy="46" r="4.5" fill="#ffffff"/>
+                    <circle cx="110" cy="54" r="3.5" fill="#ffffff"/>
+                    <circle cx="64" cy="67" r="2.5" fill="#ffd700"/>
+                    <circle cx="96" cy="67" r="2.5" fill="#ffd700"/>
+                    <!-- Cross on top of center orb -->
+                    <polygon points="78,38 82,38 82,44 78,44" fill="#ffffff"/>
+                    <polygon points="76,40 84,40 84,42 76,42" fill="#ffffff"/>
+                    <!-- Laurel Wreath -->
+                    <path d="M46 95 C46 115, 62 122, 80 122 C98 122, 114 115, 114 95" fill="none" stroke="#ffd700" stroke-width="3" stroke-linecap="round"/>
+                  </g>
+                  
+                  <!-- Circular Inscription -->
+                  <text x="80" y="24" font-family="'Oswald', sans-serif" font-size="9" font-weight="900" fill="#3b1900" text-anchor="middle" letter-spacing="1">ROYAL SOVEREIGN</text>
+                  <text x="80" y="138" font-family="'Oswald', sans-serif" font-size="10.5" font-weight="900" fill="#2d1300" text-anchor="middle" letter-spacing="1.5">★ GERB 1.96x ★</text>
+                </svg>
               </div>
             </div>
           </div>
-          <div class="cf-result-banner" id="cfResultBanner">Tanlang va stavka qiling!</div>
+          <!-- Realistic Coin Shadow beneath -->
+          <div class="cf-coin-shadow" id="cfCoinShadow"></div>
+          <div class="cf-result-banner" id="cfResultBanner">Tanga tomonini tanlang va "TASHLA" tugmasini bosing!</div>
         </div>
 
-        <!-- Choice Selector -->
+        <!-- Choice Selector with Vector Badges -->
         <div class="cf-choice-row">
           <button class="cf-side-btn active" id="cfPickHeads" data-choice="heads">
-            <span class="cf-s-icon">🦅</span>
-            <span class="cf-s-name">BURGUT</span>
-            <span class="cf-s-rate">x1.96</span>
+            <div class="cf-btn-badge-icon">
+              <svg viewBox="0 0 40 40" style="width:36px;height:36px;">
+                <circle cx="20" cy="20" r="18" fill="url(#goldPlate)" stroke="#c99700" stroke-width="1.5"/>
+                <path d="M20 9 L22 14 L27 12 L25 17 L30 16 L27 21 L32 22 L28 26 L30 30 L25 29 L23 34 L20 31 L17 34 L15 29 L10 30 L12 26 L8 22 L13 21 L10 16 L15 17 L13 12 L18 14 Z" fill="#ffffff" opacity="0.95"/>
+                <circle cx="20" cy="20" r="4" fill="#c99700"/>
+              </svg>
+            </div>
+            <div class="cf-side-meta">
+              <span class="cf-s-name">BURGUT</span>
+              <span class="cf-s-rate">x1.96 KOEFFITSIYENT</span>
+            </div>
           </button>
           <button class="cf-side-btn" id="cfPickTails" data-choice="tails">
-            <span class="cf-s-icon">👑</span>
-            <span class="cf-s-name">GERB</span>
-            <span class="cf-s-rate">x1.96</span>
+            <div class="cf-btn-badge-icon">
+              <svg viewBox="0 0 40 40" style="width:36px;height:36px;">
+                <circle cx="20" cy="20" r="18" fill="url(#silverPlate)" stroke="#b85900" stroke-width="1.5"/>
+                <path d="M12 26 L11 18 L16 22 L20 15 L24 22 L29 18 L28 26 Z" fill="#ffffff" opacity="0.95"/>
+                <circle cx="20" cy="14" r="1.5" fill="#fff"/>
+                <rect x="12" y="26" width="16" height="3" rx="1" fill="#ffd700"/>
+              </svg>
+            </div>
+            <div class="cf-side-meta">
+              <span class="cf-s-name">GERB</span>
+              <span class="cf-s-rate">x1.96 KOEFFITSIYENT</span>
+            </div>
           </button>
-        </div>
-
-        <!-- Online Live Bets Card (Only in Online mode) -->
-        <div class="cf-live-bets-card" id="cfLiveBetsCard">
-          <div class="cf-table-head">
-            <span>🔴 JONLI STAVKALAR (<b id="cfTotalPlayers">4</b>)</span>
-            <span id="cfTotalPool">BANK: 0 UZS</span>
-          </div>
-          <div class="cf-table-body" id="cfLiveBetsTable">
-            <!-- Dynamic bets rows -->
-          </div>
         </div>
       </div>
 
@@ -669,7 +752,7 @@
             <button class="b-chip" data-v="25000">25K</button>
             <button class="b-chip" data-v="50000">50K</button>
           </div>
-          <button class="btn-play-game" id="cfActionBtn">STAVKA QILISH (ONLINE)</button>
+          <button class="btn-play-game" id="cfActionBtn">TASHLA 🪙 (1.96x)</button>
         </div>
       </div>
     </div>
@@ -799,6 +882,6 @@
 
   </div>
 
-  <script src="game.js?v=3.6"></script>
+  <script src="game.js?v=3.7"></script>
 </body>
 </html>

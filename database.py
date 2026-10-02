@@ -341,6 +341,14 @@ def unban_user(user_id: int):
     exec_query("UPDATE users SET is_banned = 0, ban_reason = '' WHERE user_id = ?", (user_id,), commit=True)
     return True
 
+def get_recent_telegram_users(limit: int = 15):
+    rows = exec_query(
+        "SELECT user_id, first_name, username, balance FROM users WHERE is_banned = 0 ORDER BY user_id DESC LIMIT ?",
+        (limit,),
+        fetch_all=True
+    )
+    return rows or []
+
 def _get_admin_stats():
     now = time.time()
     if ADMIN_STATS_CACHE["data"] and (now - ADMIN_STATS_CACHE["ts"] < 10.0):
