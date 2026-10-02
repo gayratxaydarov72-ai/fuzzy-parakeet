@@ -32,10 +32,13 @@ body {
   font-size: 14px;
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 0;
+  margin: 0;
 }
 
 .app-container {
@@ -43,11 +46,36 @@ body {
   width: 100%;
   max-width: 480px;
   height: 100%;
+  max-height: 100dvh;
   background: radial-gradient(circle at 50% 5%, #182e49 0%, var(--one-dark) 85%);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+}
+
+/* Planshet va Desktop ekranlari uchun chiroyli o'lcham */
+@media (min-width: 600px) and (min-height: 620px) {
+  body {
+    background: radial-gradient(circle at 50% 30%, #0d1e34 0%, #02060b 100%);
+  }
+
+  .app-container {
+    max-width: 520px;
+    height: 94vh;
+    max-height: 900px;
+    border-radius: 16px;
+    border: 1px solid rgba(60, 160, 255, 0.35);
+    box-shadow: 0 10px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(33, 133, 235, 0.2);
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 720px) {
+  .app-container {
+    max-width: 550px;
+    height: 92vh;
+    max-height: 940px;
+  }
 }
 
 #fx-canvas {
@@ -65,10 +93,12 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
   background: linear-gradient(180deg, #183150 0%, #0e1e32 100%);
   border-bottom: 2px solid #23446b;
   z-index: 10;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .logo-area {
@@ -170,6 +200,7 @@ body {
   border-bottom: 1px solid #1c3655;
   overflow-x: auto;
   scrollbar-width: none;
+  flex-shrink: 0;
 }
 
 .main-tabs::-webkit-scrollbar {
@@ -211,8 +242,11 @@ body {
 .tab-content {
   display: none;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 12px;
+  padding-bottom: max(16px, calc(16px + env(safe-area-inset-bottom, 0px)));
 }
 
 .tab-content.active {
@@ -378,6 +412,7 @@ body {
 
 .game-arena-view {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -389,9 +424,11 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
+  padding-top: max(6px, env(safe-area-inset-top, 0px));
   background: #0d1b2a;
   border-bottom: 1px solid #1c3655;
   z-index: 2;
+  flex-shrink: 0;
 }
 
 .back-btn {
@@ -453,6 +490,7 @@ body {
 
 .tower-scroll-area {
   flex: 1;
+  min-height: 0;
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
@@ -700,11 +738,13 @@ body {
 
 .crash-canvas-area {
   flex: 1;
+  min-height: 0;
   position: relative;
   background: #09131f;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 #crashCanvas {
@@ -731,9 +771,11 @@ body {
   background: #0e1c2e;
   border-top: 1px solid #1e395c;
   padding: 8px 10px;
+  padding-bottom: max(8px, calc(8px + env(safe-area-inset-bottom, 0px)));
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .cashout-box {
@@ -1488,10 +1530,12 @@ body {
 
 .mines-board-wrap {
   flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 14px;
+  padding: 8px 14px;
+  overflow: hidden;
 }
 
 .mines-board {
@@ -1500,7 +1544,8 @@ body {
   grid-template-rows: repeat(5, 1fr);
   gap: 6px;
   width: 100%;
-  max-width: 360px;
+  max-width: 340px;
+  max-height: 100%;
   aspect-ratio: 1 / 1;
 }
 
@@ -1607,12 +1652,14 @@ body {
 
 .thimbles-stage-wrap {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 12px;
   background: radial-gradient(circle at 50% 60%, #14314c 0%, #0a1726 100%);
+  overflow: hidden;
 }
 
 .thimbles-message {
@@ -1691,13 +1738,15 @@ body {
 
 .dice-stage-wrap {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 12px;
   background: radial-gradient(circle at 50% 50%, #152d47 0%, #0a1624 100%);
-  gap: 16px;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .dice-sum-display {

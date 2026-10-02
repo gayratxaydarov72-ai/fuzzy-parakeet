@@ -3,9 +3,23 @@ if (tg) {
   try {
     tg.ready();
     tg.expand();
-    tg.enableClosingConfirmation();
+    tg.enableClosingConfirmation?.();
+    if (tg.requestFullscreen) tg.requestFullscreen();
+    if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    if (tg.setHeaderColor) tg.setHeaderColor('#183150');
+    if (tg.setBackgroundColor) tg.setBackgroundColor('#0a1420');
   } catch (e) {}
 }
+
+window.addEventListener("resize", () => {
+  try {
+    tg?.expand?.();
+  } catch (e) {}
+  if (typeof crashCanvas !== "undefined" && crashCanvas && crashCanvas.parentElement) {
+    crashCanvas.width = crashCanvas.parentElement.clientWidth;
+    crashCanvas.height = crashCanvas.parentElement.clientHeight;
+  }
+});
 
 const urlParams = new URLSearchParams(window.location.search);
 let initialUid = urlParams.get("uid");
