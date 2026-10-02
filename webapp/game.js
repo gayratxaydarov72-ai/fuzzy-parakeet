@@ -537,15 +537,26 @@ const TASK_ICONS = {
   play_kamikaze: "🛩",
   play_mines: "💎",
   play_aviator: "🚀",
+  play_apple: "🍏",
   play_thimbles: "🪚",
   play_dice: "🎲",
   reach_multiplier: "⚡",
+  win_games: "🏆",
   high_stake: "💰",
   invite_friend: "👥"
 };
 
 let tasksTimerInterval = null;
 let serverSecondsLeft = 0;
+
+function updateAllTimerDisplays(str) {
+  const el = document.getElementById("taskResetTimer");
+  if (el) el.textContent = str;
+  const bEl = document.getElementById("taskBottomTimer");
+  if (bEl) bEl.textContent = str;
+  const cEl = document.getElementById("compCountdownTimer");
+  if (cEl) cEl.textContent = str;
+}
 
 function startTasksCountdownTimer(initialSeconds) {
   if (tasksTimerInterval) clearInterval(tasksTimerInterval);
@@ -560,8 +571,7 @@ function startTasksCountdownTimer(initialSeconds) {
 
   function tick() {
     if (serverSecondsLeft <= 0) {
-      const el = document.getElementById("taskResetTimer");
-      if (el) el.textContent = "00:00:00";
+      updateAllTimerDisplays("00:00:00");
       clearInterval(tasksTimerInterval);
       setTimeout(async () => {
         const data = await apiFetch(`/api/tasks?user_id=${USER_ID}`);
@@ -580,8 +590,7 @@ function startTasksCountdownTimer(initialSeconds) {
     const hh = String(h).padStart(2, "0");
     const mm = String(m).padStart(2, "0");
     const ss = String(s).padStart(2, "0");
-    const el = document.getElementById("taskResetTimer");
-    if (el) el.textContent = `${hh}:${mm}:${ss}`;
+    updateAllTimerDisplays(`${hh}:${mm}:${ss}`);
     serverSecondsLeft--;
   }
 
@@ -679,6 +688,12 @@ function renderTasksList(tasks) {
   if (badge) {
     badge.textContent = claimableCount;
     badge.style.display = claimableCount > 0 ? "inline-block" : "none";
+  }
+
+  const allClaimed = tasks.length > 0 && tasks.every(t => t.claimed === 1 || t.claimed === true);
+  const doneBanner = document.getElementById("allTasksDoneBanner");
+  if (doneBanner) {
+    doneBanner.style.display = allClaimed ? "flex" : "none";
   }
 }
 

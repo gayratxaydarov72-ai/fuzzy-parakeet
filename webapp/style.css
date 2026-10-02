@@ -2099,6 +2099,84 @@ body {
   }
 }
 
+.all-tasks-completed-box {
+  background: linear-gradient(135deg, rgba(255, 199, 0, 0.12) 0%, rgba(255, 110, 0, 0.18) 100%);
+  border: 1.5px solid rgba(255, 199, 0, 0.5);
+  border-radius: 14px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(255, 199, 0, 0.15);
+  animation: pulseGold 2.5s infinite;
+}
+
+.comp-icon {
+  font-size: 32px;
+}
+
+.comp-title {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffc700;
+  letter-spacing: 0.5px;
+}
+
+.comp-desc {
+  font-size: 11px;
+  color: #cadbec;
+  line-height: 1.4;
+  max-width: 290px;
+}
+
+.comp-timer-chip {
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 199, 0, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffc700;
+  letter-spacing: 1px;
+}
+
+.tasks-bottom-cycle-info {
+  background: rgba(13, 27, 44, 0.7);
+  border: 1px dashed rgba(60, 160, 255, 0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bottom-timer-label {
+  font-size: 11px;
+  color: #8da4be;
+  font-weight: 600;
+}
+
+.bottom-timer-digits {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 800;
+  color: #3ca0ff;
+  letter-spacing: 0.8px;
+}
+
+@keyframes pulseGold {
+  0% { box-shadow: 0 0 10px rgba(255, 199, 0, 0.15); }
+  50% { box-shadow: 0 0 22px rgba(255, 199, 0, 0.35); }
+  100% { box-shadow: 0 0 10px rgba(255, 199, 0, 0.15); }
+}
+
 .game-arena-view, .section-card, .cell, .mine-tile, .thimble-cup, .dice-cube {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;

@@ -469,9 +469,16 @@
           <button class="btn-claim-all" id="claimAllTasksBtn" style="display: none;">BARCHASINI YIG'ISH</button>
         </div>
 
+        <div class="all-tasks-completed-box" id="allTasksDoneBanner" style="display: none;">
+          <div class="comp-icon">🏆</div>
+          <div class="comp-title">BARCHA 10 TA VAZIFA BAJARILDI!</div>
+          <div class="comp-desc">Tabriklaymiz, siz bugungi barcha mukofotlarni yig'ib oldingiz! Yangi 24 soatlik vazifalar to'plamini kuting:</div>
+          <div class="comp-timer-chip">⏳ <span id="compCountdownTimer">--:--:--</span></div>
+        </div>
+
         <div class="tasks-summary-bar">
           <div class="sum-item">
-            <span class="sum-val" id="tasksDoneCount">0 / 5</span>
+            <span class="sum-val" id="tasksDoneCount">0 / 10</span>
             <span class="sum-lbl">Bajarilgan</span>
           </div>
           <div class="sum-item">
@@ -482,6 +489,12 @@
 
         <div class="sec-desc">Vazifalar har 24 soatda avtomatik almashadi. Mukofotlarni faqat ushbu Mini App ichida yig'ib olishingiz mumkin!</div>
         <div class="tasks-list" id="tasksList"></div>
+
+        <div class="tasks-bottom-cycle-info" id="tasksBottomTimerBar">
+          <span class="timer-icon">⏳</span>
+          <span class="bottom-timer-label">Keyingi 24 soatlik vazifalar sikligacha:</span>
+          <span class="bottom-timer-digits" id="taskBottomTimer">--:--:--</span>
+        </div>
       </div>
     </div>
 

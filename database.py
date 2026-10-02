@@ -329,32 +329,20 @@ def ensure_daily_tasks(user_id: int):
     today = date.today().isoformat()
     day_num = date.today().toordinal()
 
-    game_rotation = [
-        ("play_kamikaze", "Kamikaze: 2 marta xavfsiz qavatga chiqish", 2500, 2),
-        ("play_mines", "Mines: 3 marta olmos ochish", 2000, 3),
-        ("play_thimbles", "Thimbles: 2 marta to'pni topish", 2000, 2),
-        ("play_dice", "Under/Over 7: 2 marta to'g'ri topish", 2000, 2)
-    ]
-    selected_game = game_rotation[day_num % len(game_rotation)]
+    is_even = (day_num % 2 == 0)
 
-    spec_rotation = [
-        ("reach_multiplier", "2.50x dan yuqori koeffitsiyent yutish", 3000, 1),
-        ("play_aviator", "Aviator: 1.80x dan yuqori yutuq olish", 2500, 1)
-    ]
-    selected_spec = spec_rotation[day_num % len(spec_rotation)]
-
-    social_rotation = [
-        ("high_stake", "Kamida 10 000 UZS stavka qilish", 3000, 1),
-        ("invite_friend", "1 ta do'stni taklif qilish (+2000 UZS)", 2000, 1)
-    ]
-    selected_social = social_rotation[(day_num // 2) % len(social_rotation)]
-
+    # 10 ta turli xil kunlik vazifalar (har 24 soatda rotatsiya bilan almashadi)
     tasks_pool = [
-        ("login_daily", "Kunlik kirish bonusi", 1000, 1),
-        selected_game,
-        ("play_games", "Istalgan o'yinlarda 5 ta raund o'ynash", 2000, 5),
-        selected_spec,
-        selected_social
+        ("login_daily", "🎁 Kunlik kirish bonusi", 1000, 1),
+        ("play_games", "🎮 Istalgan o'yinlarda 5 ta raund o'ynash" if is_even else "🎮 Istalgan o'yinlarda 8 ta raund o'ynash", 1500 if is_even else 2000, 5 if is_even else 8),
+        ("play_kamikaze", "🛩 Kamikaze: 2 marta xavfsiz qavatga chiqish" if is_even else "🛩 Kamikaze: 3 marta samolyotni boshqarish", 1500 if is_even else 2000, 2 if is_even else 3),
+        ("play_mines", "💎 Mines: 3 marta olmos ochish" if is_even else "💎 Mines: 4 marta to'g'ri katakni topish", 1500 if is_even else 2000, 3 if is_even else 4),
+        ("play_aviator", "🚀 Aviator: 1.80x dan yuqori yutuq olish" if is_even else "🚀 Aviator: 2.20x koeffitsiyentda naqdlashtirish", 2000 if is_even else 2500, 1),
+        ("play_apple", "🍏 Apple: 2 marta xavfsiz olma topish" if is_even else "🍏 Apple: 3 marta qatorlardan o'tish", 1500 if is_even else 2000, 2 if is_even else 3),
+        ("play_thimbles", "🪚 Thimbles: 2 marta to'pni topish" if is_even else "🪚 Thimbles: 3 marta to'g'ri stakanni tanlash", 1500 if is_even else 2000, 2 if is_even else 3),
+        ("play_dice", "🎲 Under/Over 7: 2 marta to'g'ri topish" if is_even else "🎲 Under/Over 7: 3 marta toshlar yig'indisini topish", 1500 if is_even else 2000, 2 if is_even else 3),
+        ("reach_multiplier" if is_even else "win_games", "⚡ Har qanday o'yinda 2.50x dan yuqori yutish" if is_even else "🏆 Istalgan o'yinlarda 3 ta g'alabaga erishish", 2500 if is_even else 2000, 1 if is_even else 3),
+        ("high_stake" if is_even else "invite_friend", "💰 Kamida 10 000 UZS stavka qilish" if is_even else "👥 1 ta yangi do'stni taklif qilish (+2000 UZS)", 2000 if is_even else 2500, 1)
     ]
 
     for key, title, reward, target in tasks_pool:
@@ -468,19 +456,24 @@ def record_game(user_id: int, game_name: str, bet: int, win: int, multiplier: fl
     """, (user_id, game_name, bet, win, multiplier, provably_hash), commit=True)
 
     update_task_progress(user_id, "play_games", 1)
+    g_name = (game_name or "").lower()
     if bet >= 10000:
         update_task_progress(user_id, "high_stake", 1)
     if multiplier >= 2.5:
         update_task_progress(user_id, "reach_multiplier", 1)
-    if game_name == "kamikaze" and win > 0:
+    if win > 0:
+        update_task_progress(user_id, "win_games", 1)
+    if "kamikaze" in g_name and win > 0:
         update_task_progress(user_id, "play_kamikaze", 1)
-    if game_name == "mines" and win > 0:
+    if "mines" in g_name and win > 0:
         update_task_progress(user_id, "play_mines", 1)
-    if game_name == "crash" and win > 0 and multiplier >= 1.8:
+    if ("crash" in g_name or "aviator" in g_name) and win > 0 and multiplier >= 1.8:
         update_task_progress(user_id, "play_aviator", 1)
-    if game_name == "thimbles" and win > 0:
+    if "apple" in g_name and win > 0:
+        update_task_progress(user_id, "play_apple", 1)
+    if "thimbles" in g_name and win > 0:
         update_task_progress(user_id, "play_thimbles", 1)
-    if game_name == "dice" and win > 0:
+    if "dice" in g_name and win > 0:
         update_task_progress(user_id, "play_dice", 1)
 
     return provably_hash
