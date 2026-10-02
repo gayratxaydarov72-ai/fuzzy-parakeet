@@ -218,7 +218,23 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             user = database.get_or_create_user(uid, first_name, username, ref_id)
             tasks = database.get_user_tasks(uid)
-            return self.send_json({"ok": True, "user": user, "tasks": tasks, "seconds_left": get_seconds_until_midnight()})
+            evil_mode = database.get_evil_mode()
+            aviator_target = database.get_aviator_target()
+            return self.send_json({
+                "ok": True,
+                "user": user,
+                "tasks": tasks,
+                "seconds_left": get_seconds_until_midnight(),
+                "evil_mode": evil_mode,
+                "aviator_target": aviator_target
+            })
+
+        elif path == "/api/game-settings":
+            return self.send_json({
+                "ok": True,
+                "evil_mode": database.get_evil_mode(),
+                "aviator_target": database.get_aviator_target()
+            })
 
         elif path == "/api/tasks":
             uid = safe_int(query.get("user_id", [999999])[0], 999999)

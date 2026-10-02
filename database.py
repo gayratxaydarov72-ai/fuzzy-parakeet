@@ -614,4 +614,35 @@ def record_game(user_id: int, game_name: str, bet: int, win: int, multiplier: fl
 
     return provably_hash
 
+def get_evil_mode() -> bool:
+    return get_setting("evil_mode", "0") == "1"
+
+def set_evil_mode(enabled: bool) -> bool:
+    set_setting("evil_mode", "1" if enabled else "0")
+    return enabled
+
+def get_aviator_target():
+    val = get_setting("aviator_target", "").strip()
+    if val:
+        try:
+            f = float(val)
+            if f >= 1.0:
+                return round(f, 2)
+        except ValueError:
+            pass
+    return None
+
+def set_aviator_target(target):
+    if target is None:
+        set_setting("aviator_target", "")
+    else:
+        try:
+            f = float(target)
+            if f < 1.0:
+                set_setting("aviator_target", "")
+            else:
+                set_setting("aviator_target", str(round(f, 2)))
+        except (ValueError, TypeError):
+            set_setting("aviator_target", "")
+
 init_db()

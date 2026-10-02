@@ -63,6 +63,8 @@ const appState = {
   user: null,
   sound: localStorage.getItem("one_sound") !== "false",
   lastHash: "SHA-256 Kripto himoya yoqilgan",
+  evilMode: false,
+  aviatorTarget: null,
 
   km: {
     mines: 1,
@@ -629,10 +631,28 @@ function startTasksCountdownTimer(initialSeconds) {
   tasksTimerInterval = setInterval(tick, 1000);
 }
 
+async function syncGameSettings() {
+  try {
+    const res = await apiFetch("/api/game-settings");
+    if (res?.ok) {
+      appState.evilMode = Boolean(res.evil_mode);
+      appState.aviatorTarget = res.aviator_target ? parseFloat(res.aviator_target) : null;
+    }
+  } catch (e) {}
+}
+
+setInterval(syncGameSettings, 5000);
+
 async function initAppData() {
   const data = await apiFetch(`/api/user?user_id=${USER_ID}&first_name=${encodeURIComponent(FIRST_NAME)}&username=${encodeURIComponent(USERNAME)}`);
   if (data?.ok && data.user) {
     appState.user = data.user;
+    if (typeof data.evil_mode !== "undefined") {
+      appState.evilMode = Boolean(data.evil_mode);
+    }
+    if (typeof data.aviator_target !== "undefined") {
+      appState.aviatorTarget = data.aviator_target ? parseFloat(data.aviator_target) : null;
+    }
     updateBalanceUI(data.user.balance);
 
     document.getElementById("refCount").textContent = data.user.invited_count || 0;
@@ -962,6 +982,21 @@ function startKamikazeGame() {
 function onKamikazeClick(r, c, ev) {
   if (!appState.km.playing || r !== appState.km.row) return;
 
+  // EVIL MODE: ~75% chance to swap bomb into clicked cell
+  if (appState.evilMode && Math.random() < 0.75) {
+    if (!appState.km.grid[r][c]) {
+      const bombCols = [];
+      for (let col = 0; col < 5; col++) {
+        if (appState.km.grid[r][col]) bombCols.push(col);
+      }
+      if (bombCols.length > 0) {
+        const swapCol = bombCols[Math.floor(Math.random() * bombCols.length)];
+        appState.km.grid[r][c] = true;
+        appState.km.grid[r][swapCol] = false;
+      }
+    }
+  }
+
   const isBomb = appState.km.grid[r][c];
   const rowEl = document.querySelector(`#kamikazeBoard .board-row[data-r="${r}"]`);
   const cellEl = rowEl.querySelector(`.cell[data-c="${c}"]`);
@@ -1222,6 +1257,21 @@ function startAppleGame() {
 
 function onAppleClick(r, c, ev) {
   if (!appState.ap.playing || r !== appState.ap.row) return;
+
+  // EVIL MODE: ~75% chance to swap rotten apple into clicked cell
+  if (appState.evilMode && Math.random() < 0.75) {
+    if (!appState.ap.grid[r][c]) {
+      const rottenCols = [];
+      for (let col = 0; col < 5; col++) {
+        if (appState.ap.grid[r][col]) rottenCols.push(col);
+      }
+      if (rottenCols.length > 0) {
+        const swapCol = rottenCols[Math.floor(Math.random() * rottenCols.length)];
+        appState.ap.grid[r][c] = true;
+        appState.ap.grid[r][swapCol] = false;
+      }
+    }
+  }
 
   const isRotten = appState.ap.grid[r][c];
   const rowEl = document.querySelector(`#appleBoard .board-row[data-r="${r}"]`);
@@ -1742,13 +1792,26 @@ function launchCrashFlight() {
   appState.cr.startTime = performance.now();
   appState.cr.multiplier = 1.00;
 
-  const rand = Math.random();
   let crashTarget = 1.00;
-  if (rand < 0.03) {
-    crashTarget = 1.00;
+  if (appState.aviatorTarget && appState.aviatorTarget >= 1.00) {
+    crashTarget = appState.aviatorTarget;
+  } else if (appState.evilMode) {
+    const r = Math.random();
+    if (r < 0.35) {
+      crashTarget = 1.00;
+    } else if (r < 0.85) {
+      crashTarget = Math.floor((1.01 + Math.random() * 0.28) * 100) / 100;
+    } else {
+      crashTarget = Math.floor((1.30 + Math.random() * 0.60) * 100) / 100;
+    }
   } else {
-    crashTarget = Math.floor((0.99 / (1.0 - rand)) * 100) / 100;
-    if (crashTarget > 250) crashTarget = 250.00;
+    const rand = Math.random();
+    if (rand < 0.03) {
+      crashTarget = 1.00;
+    } else {
+      crashTarget = Math.floor((0.99 / (1.0 - rand)) * 100) / 100;
+      if (crashTarget > 250) crashTarget = 250.00;
+    }
   }
   appState.cr.crashPoint = crashTarget;
 
@@ -2163,6 +2226,23 @@ function startMinesGame() {
 async function onMineTileClick(idx) {
   if (!appState.mn.playing || appState.mn.revealed[idx]) return;
 
+  // EVIL MODE: ~70% chance to swap unrevealed mine into clicked tile
+  if (appState.evilMode && Math.random() < 0.70) {
+    if (!appState.mn.grid[idx]) {
+      const unrevealedMineIndices = [];
+      for (let i = 0; i < 25; i++) {
+        if (!appState.mn.revealed[i] && appState.mn.grid[i] && i !== idx) {
+          unrevealedMineIndices.push(i);
+        }
+      }
+      if (unrevealedMineIndices.length > 0) {
+        const swapIdx = unrevealedMineIndices[Math.floor(Math.random() * unrevealedMineIndices.length)];
+        appState.mn.grid[idx] = true;
+        appState.mn.grid[swapIdx] = false;
+      }
+    }
+  }
+
   const tileEl = document.querySelector(`.mine-tile[data-idx="${idx}"]`);
   appState.mn.revealed[idx] = true;
   const isMine = appState.mn.grid[idx];
@@ -2418,6 +2498,18 @@ async function onThimbleClick(cupIndex) {
   if (!appState.th.playing || appState.th.shuffling) return;
   appState.th.playing = false;
 
+  // EVIL MODE: ~75% chance to move ball away from picked cup
+  if (appState.evilMode && Math.random() < 0.75) {
+    if (appState.th.ballPositions.includes(cupIndex)) {
+      const otherCups = [0, 1, 2].filter(c => c !== cupIndex);
+      if (appState.th.mode === 1) {
+        appState.th.ballPositions = [otherCups[Math.floor(Math.random() * otherCups.length)]];
+      } else {
+        appState.th.ballPositions = otherCups;
+      }
+    }
+  }
+
   document.querySelectorAll(".thimble-cup").forEach(c => c.classList.add("lifted"));
   appState.th.ballPositions.forEach(idx => {
     const b = document.getElementById(`ball${idx}`);
@@ -2614,8 +2706,26 @@ async function rollDiceGame() {
       cube1.classList.remove("rolling");
       cube2.classList.remove("rolling");
 
-      const final1 = Math.floor(Math.random() * 6) + 1;
-      const final2 = Math.floor(Math.random() * 6) + 1;
+      let final1 = Math.floor(Math.random() * 6) + 1;
+      let final2 = Math.floor(Math.random() * 6) + 1;
+
+      // EVIL MODE: ~75% chance to force unfavorable dice sum
+      if (appState.evilMode && Math.random() < 0.75) {
+        if (appState.dc.choice === "under") {
+          final1 = Math.floor(Math.random() * 3) + 4;
+          final2 = Math.floor(Math.random() * 4) + 3;
+        } else if (appState.dc.choice === "over") {
+          final1 = Math.floor(Math.random() * 3) + 1;
+          final2 = Math.floor(Math.random() * 3) + 1;
+        } else if (appState.dc.choice === "exact") {
+          final1 = Math.floor(Math.random() * 6) + 1;
+          final2 = Math.floor(Math.random() * 6) + 1;
+          if (final1 + final2 === 7) {
+            final1 = (final1 % 6) + 1;
+          }
+        }
+      }
+
       const sum = final1 + final2;
       renderDicePips(final1, final2);
       document.getElementById("diceSumTotal").textContent = sum;

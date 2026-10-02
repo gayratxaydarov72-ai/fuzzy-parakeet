@@ -221,8 +221,17 @@ def get_main_keyboard(user_id: int):
     )
 
 def get_admin_keyboard():
+    evil_on = database.get_evil_mode()
+    evil_text = "😈 Evil Mode: ON 🔴" if evil_on else "😇 Evil Mode: OFF 🟢"
+    aviator_target = database.get_aviator_target()
+    aviator_text = f"🚀 Aviator: {aviator_target:.2f}x" if aviator_target else "🚀 Aviator: Avto 🎲"
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [
+                InlineKeyboardButton(text=evil_text, callback_data="admin_toggle_evil"),
+                InlineKeyboardButton(text=aviator_text, callback_data="admin_aviator_menu")
+            ],
             [
                 InlineKeyboardButton(text="📊 Yangilash", callback_data="admin_refresh"),
                 InlineKeyboardButton(text="🚫 Bloklanganlar", callback_data="admin_banned")
@@ -237,12 +246,41 @@ def get_admin_keyboard():
         ]
     )
 
+def get_aviator_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💥 1.00x (Darhol portlash)", callback_data="set_crash_1.00")
+            ],
+            [
+                InlineKeyboardButton(text="⚡ 1.10x", callback_data="set_crash_1.10"),
+                InlineKeyboardButton(text="⚡ 1.25x", callback_data="set_crash_1.25"),
+                InlineKeyboardButton(text="🎯 1.50x", callback_data="set_crash_1.50")
+            ],
+            [
+                InlineKeyboardButton(text="🎯 2.00x", callback_data="set_crash_2.00"),
+                InlineKeyboardButton(text="🚀 3.00x", callback_data="set_crash_3.00"),
+                InlineKeyboardButton(text="🚀 5.00x", callback_data="set_crash_5.00")
+            ],
+            [
+                InlineKeyboardButton(text="🎲 Tasodifiy (Avto RNG)", callback_data="set_crash_auto")
+            ],
+            [
+                InlineKeyboardButton(text="⬅️ Admin panelga qaytish", callback_data="admin_refresh")
+            ]
+        ]
+    )
+
 def render_admin_dashboard():
     total_users = database.get_all_users_count()
     banned_users = database.get_banned_users_count()
     total_balance = database.get_total_balance()
     total_games = database.get_total_games()
     live_url = get_live_url()
+    evil_on = database.get_evil_mode()
+    evil_status = "🔴 YOQILGAN (O'yinchilar ko'pincha yutqazadi)" if evil_on else "🟢 O'CHIRILGAN (Adolatli Provably Fair RNG)"
+    aviator_target = database.get_aviator_target()
+    aviator_status = f"🎯 {aviator_target:.2f}x da qat'iy portlaydi" if aviator_target else "🎲 Tasodifiy (Avto RNG)"
 
     return (
         f"👑 <b>NVINDIA GAMES — BOSH ADMIN PANELI</b>\n\n"
@@ -254,7 +292,12 @@ def render_admin_dashboard():
         f"• Jami foydalanuvchilar balansi: <b>{total_balance:,} UZS</b>\n"
         f"• Jami o'ynalgan raundlar: <b>{total_games:,} ta</b>\n"
         f"• Jonli WebApp URL: <code>{live_url}</code>\n\n"
+        f"🎛 <b>O'yin algoritmlarini boshqarish:</b>\n"
+        f"• 😈 <b>Evil Mode:</b> <b>{evil_status}</b>\n"
+        f"• 🚀 <b>Aviator Crash:</b> <b>{aviator_status}</b>\n\n"
         f"🛠 <b>Mavjud boshqaruv buyruqlari:</b>\n"
+        f"• <code>/evil [on/off]</code> — Evil Mode rejimini boshqarish\n"
+        f"• <code>/setcrash &lt;koeffitsiyent/auto&gt;</code> — Aviator portlash nuqtasini belgilash (masalan: <code>/setcrash 1.00</code>)\n"
         f"• <code>/ban &lt;user_id&gt; [sabab]</code> — O'yinchini bloklash\n"
         f"• <code>/unban &lt;user_id&gt;</code> — Blokdan chiqarish\n"
         f"• <code>/user &lt;user_id&gt;</code> — O'yinchi profilini ko'rish\n"
@@ -547,6 +590,109 @@ async def admin_url_info_callback(call: types.CallbackQuery):
     )
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
+
+@dp.message(Command("evil"))
+async def evil_cmd(message: types.Message, command: CommandObject):
+    if not is_admin(message.from_user.id):
+        return
+    arg = (command.args or "").strip().lower()
+    if arg in ("on", "1", "true", "yoq", "start"):
+        database.set_evil_mode(True)
+        await message.answer("😈 <b>Evil Mode YOQILDI!</b>\nO'yinchilar ko'pincha yutqazishni boshlaydi.", parse_mode="HTML")
+    elif arg in ("off", "0", "false", "ochir", "stop"):
+        database.set_evil_mode(False)
+        await message.answer("🟢 <b>Evil Mode O'CHIRILDI!</b>\nO'yinlar odatdagi adolatli Provably Fair RNG rejimiga o'tdi.", parse_mode="HTML")
+    else:
+        current = database.get_evil_mode()
+        new_state = not current
+        database.set_evil_mode(new_state)
+        st = "YOQILDI 🔴" if new_state else "O'CHIRILDI 🟢"
+        await message.answer(f"😈 <b>Evil Mode {st}!</b>", parse_mode="HTML")
+
+@dp.message(Command("setcrash"))
+async def setcrash_cmd(message: types.Message, command: CommandObject):
+    if not is_admin(message.from_user.id):
+        return
+    arg = (command.args or "").strip().lower()
+    if not arg or arg in ("auto", "avto", "reset", "rng"):
+        database.set_aviator_target(None)
+        await message.answer("🚀 <b>Aviator: Tasodifiy (Avto RNG) rejimi o'rnatildi!</b>", parse_mode="HTML")
+        return
+    try:
+        f = float(arg.replace(",", "."))
+        if f < 1.0:
+            f = 1.0
+        database.set_aviator_target(f)
+        await message.answer(
+            f"🚀 <b>Aviator crash nuqtasi o'rnatildi: {f:.2f}x!</b>\n"
+            f"Endi samolyot aynan <b>{f:.2f}x</b> ga yetganda portlaydi.",
+            parse_mode="HTML"
+        )
+    except ValueError:
+        await message.answer(
+            "Foydalanish: <code>/setcrash 1.00</code> yoki <code>/setcrash 1.50</code> yoki <code>/setcrash auto</code>",
+            parse_mode="HTML"
+        )
+
+@dp.callback_query(F.data == "admin_toggle_evil")
+async def admin_toggle_evil_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    current = database.get_evil_mode()
+    new_state = not current
+    database.set_evil_mode(new_state)
+    alert = "😈 Evil Mode YOQILDI! O'yinchilar ko'pincha yutqazadi." if new_state else "🟢 Evil Mode O'CHIRILDI! O'yinlar adolatli RNG rejimiga qaytdi."
+    await call.answer(alert, show_alert=True)
+    text = render_admin_dashboard()
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_keyboard())
+    except Exception:
+        pass
+
+@dp.callback_query(F.data == "admin_aviator_menu")
+async def admin_aviator_menu_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    curr = database.get_aviator_target()
+    curr_str = f"<b>{curr:.2f}x</b>" if curr else "<b>🎲 Tasodifiy (Avto RNG)</b>"
+    text = (
+        f"🚀 <b>AVIATOR (CRASH) PORTLASH NUQTASINI BOSHQARISH:</b>\n\n"
+        f"Hozirgi belgilangan nuqta: {curr_str}\n\n"
+        f"Samolyot qaysi koeffitsiyentda portlashini tanlang:\n"
+        f"• <b>1.00x</b> tanlansa — samolyot uchishi bilanoq darhol portlaydi!\n"
+        f"• <b>Avto RNG</b> tanlansa — tasodifiy Provably Fair asosida parvoz qiladi.\n\n"
+        f"<i>Shuningdek <code>/setcrash &lt;qiymat&gt;</code> buyrug'i orqali istalgan sonni kiritishingiz mumkin.</i>"
+    )
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_aviator_keyboard())
+    except Exception:
+        pass
+    await call.answer()
+
+@dp.callback_query(F.data.startswith("set_crash_"))
+async def set_crash_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    val = call.data.replace("set_crash_", "")
+    if val == "auto":
+        database.set_aviator_target(None)
+        await call.answer("🚀 Aviator: Tasodifiy (Avto RNG) faollashdi!", show_alert=True)
+    else:
+        try:
+            f = float(val)
+            database.set_aviator_target(f)
+            await call.answer(f"🚀 Aviator portlash nuqtasi: {f:.2f}x belgilandi!", show_alert=True)
+        except ValueError:
+            pass
+
+    text = render_admin_dashboard()
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_keyboard())
+    except Exception:
+        pass
 
 @dp.message(CommandStart())
 async def command_start_handler(message: types.Message, command: CommandObject, bot: Bot):
