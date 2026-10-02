@@ -327,15 +327,37 @@ def get_or_create_user(user_id: int, first_name: str = "", username: str = "", r
 
 def ensure_daily_tasks(user_id: int):
     today = date.today().isoformat()
-    default_tasks = [
+    day_num = date.today().toordinal()
+
+    game_rotation = [
+        ("play_kamikaze", "Kamikaze: 2 marta xavfsiz qavatga chiqish", 2500, 2),
+        ("play_mines", "Mines: 3 marta olmos ochish", 2000, 3),
+        ("play_thimbles", "Thimbles: 2 marta to'pni topish", 2000, 2),
+        ("play_dice", "Under/Over 7: 2 marta to'g'ri topish", 2000, 2)
+    ]
+    selected_game = game_rotation[day_num % len(game_rotation)]
+
+    spec_rotation = [
+        ("reach_multiplier", "2.50x dan yuqori koeffitsiyent yutish", 3000, 1),
+        ("play_aviator", "Aviator: 1.80x dan yuqori yutuq olish", 2500, 1)
+    ]
+    selected_spec = spec_rotation[day_num % len(spec_rotation)]
+
+    social_rotation = [
+        ("high_stake", "Kamida 10 000 UZS stavka qilish", 3000, 1),
+        ("invite_friend", "1 ta do'stni taklif qilish (+2000 UZS)", 2000, 1)
+    ]
+    selected_social = social_rotation[(day_num // 2) % len(social_rotation)]
+
+    tasks_pool = [
         ("login_daily", "Kunlik kirish bonusi", 1000, 1),
-        ("play_games", "5 ta istalgan o'yin o'ynash", 2000, 5),
-        ("reach_multiplier", "2.00x dan yuqori yutuq olish", 2500, 1),
-        ("invite_friend", "1 ta do'stni taklif qilish (+2000 UZS)", 2000, 1),
-        ("high_stake", "Kamida 10 000 UZS stavka qilish", 3000, 1)
+        selected_game,
+        ("play_games", "Istalgan o'yinlarda 5 ta raund o'ynash", 2000, 5),
+        selected_spec,
+        selected_social
     ]
 
-    for key, title, reward, target in default_tasks:
+    for key, title, reward, target in tasks_pool:
         if USE_POSTGRES:
             exec_query("""
                 INSERT INTO daily_tasks 
@@ -356,11 +378,6 @@ def update_task_progress(user_id: int, task_key: str, increment: int = 1):
     today = date.today().isoformat()
     exec_query("""
         UPDATE daily_tasks 
-        SET current_val = LEAST(target_val, current_val + ?) if exists else current_val,
-            completed = CASE WHEN (current_val + ?) >= target_val THEN 1 ELSE completed END
-        WHERE user_id = ? AND task_key = ? AND task_date = ? AND completed = 0
-    """ if False else """
-        UPDATE daily_tasks 
         SET current_val = CASE WHEN (current_val + ?) > target_val THEN target_val ELSE (current_val + ?) END,
             completed = CASE WHEN (current_val + ?) >= target_val THEN 1 ELSE completed END
         WHERE user_id = ? AND task_key = ? AND task_date = ? AND completed = 0
@@ -380,6 +397,24 @@ def claim_task(user_id: int, task_key: str):
     exec_query("UPDATE daily_tasks SET claimed = 1 WHERE id = ?", (task["id"],), commit=True)
     exec_query("UPDATE users SET balance = balance + ? WHERE user_id = ?", (reward, user_id), commit=True)
     return True, reward
+
+def claim_all_tasks(user_id: int):
+    today = date.today().isoformat()
+    tasks = exec_query("""
+        SELECT * FROM daily_tasks 
+        WHERE user_id = ? AND task_date = ? AND completed = 1 AND claimed = 0
+    """, (user_id, today), fetch_all=True)
+
+    if not tasks:
+        return False, 0
+
+    total_reward = 0
+    for t in tasks:
+        total_reward += t["reward"]
+        exec_query("UPDATE daily_tasks SET claimed = 1 WHERE id = ?", (t["id"],), commit=True)
+
+    exec_query("UPDATE users SET balance = balance + ? WHERE user_id = ?", (total_reward, user_id), commit=True)
+    return True, total_reward
 
 def get_user_tasks(user_id: int):
     today = date.today().isoformat()
@@ -435,8 +470,18 @@ def record_game(user_id: int, game_name: str, bet: int, win: int, multiplier: fl
     update_task_progress(user_id, "play_games", 1)
     if bet >= 10000:
         update_task_progress(user_id, "high_stake", 1)
-    if multiplier >= 2.0:
+    if multiplier >= 2.5:
         update_task_progress(user_id, "reach_multiplier", 1)
+    if game_name == "kamikaze" and win > 0:
+        update_task_progress(user_id, "play_kamikaze", 1)
+    if game_name == "mines" and win > 0:
+        update_task_progress(user_id, "play_mines", 1)
+    if game_name == "crash" and win > 0 and multiplier >= 1.8:
+        update_task_progress(user_id, "play_aviator", 1)
+    if game_name == "thimbles" and win > 0:
+        update_task_progress(user_id, "play_thimbles", 1)
+    if game_name == "dice" and win > 0:
+        update_task_progress(user_id, "play_dice", 1)
 
     return provably_hash
 

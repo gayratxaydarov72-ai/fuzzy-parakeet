@@ -531,6 +531,64 @@ async function apiFetch(endpoint, method = "GET", body = null) {
   }
 }
 
+const TASK_ICONS = {
+  login_daily: "🎁",
+  play_games: "🎮",
+  play_kamikaze: "🛩",
+  play_mines: "💎",
+  play_aviator: "🚀",
+  play_thimbles: "🪚",
+  play_dice: "🎲",
+  reach_multiplier: "⚡",
+  high_stake: "💰",
+  invite_friend: "👥"
+};
+
+let tasksTimerInterval = null;
+let serverSecondsLeft = 0;
+
+function startTasksCountdownTimer(initialSeconds) {
+  if (tasksTimerInterval) clearInterval(tasksTimerInterval);
+  if (typeof initialSeconds === "number" && initialSeconds > 0) {
+    serverSecondsLeft = initialSeconds;
+  } else {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    serverSecondsLeft = Math.max(0, Math.floor((midnight - now) / 1000));
+  }
+
+  function tick() {
+    if (serverSecondsLeft <= 0) {
+      const el = document.getElementById("taskResetTimer");
+      if (el) el.textContent = "00:00:00";
+      clearInterval(tasksTimerInterval);
+      setTimeout(async () => {
+        const data = await apiFetch(`/api/tasks?user_id=${USER_ID}`);
+        if (data?.ok) {
+          renderTasksList(data.tasks || []);
+          startTasksCountdownTimer(data.seconds_left);
+          showToast("🔄 Yangi 24 soatlik vazifalar boshlandi!", true);
+        }
+      }, 1000);
+      return;
+    }
+
+    const h = Math.floor(serverSecondsLeft / 3600);
+    const m = Math.floor((serverSecondsLeft % 3600) / 60);
+    const s = serverSecondsLeft % 60;
+    const hh = String(h).padStart(2, "0");
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    const el = document.getElementById("taskResetTimer");
+    if (el) el.textContent = `${hh}:${mm}:${ss}`;
+    serverSecondsLeft--;
+  }
+
+  tick();
+  tasksTimerInterval = setInterval(tick, 1000);
+}
+
 async function initAppData() {
   const data = await apiFetch(`/api/user?user_id=${USER_ID}&first_name=${encodeURIComponent(FIRST_NAME)}&username=${encodeURIComponent(USERNAME)}`);
   if (data?.ok && data.user) {
@@ -545,46 +603,98 @@ async function initAppData() {
     document.getElementById("refLinkInput").value = refLink;
 
     renderTasksList(data.tasks || []);
+    startTasksCountdownTimer(data.seconds_left);
   }
 }
 
 function renderTasksList(tasks) {
   const container = document.getElementById("tasksList");
+  if (!container) return;
   container.innerHTML = "";
   let claimableCount = 0;
+  let doneCount = 0;
+  let totalReward = 0;
 
   tasks.forEach(t => {
+    totalReward += t.reward;
+    if (t.completed) doneCount++;
     if (t.completed && !t.claimed) claimableCount++;
 
     const div = document.createElement("div");
-    div.className = "task-item";
+    div.className = `task-item ${t.claimed ? "claimed" : (t.completed ? "ready" : "")}`;
     const pct = Math.min(100, Math.round((t.current_val / t.target_val) * 100));
+    const icon = TASK_ICONS[t.task_key] || "🎯";
 
     div.innerHTML = `
-      <div class="t-info">
-        <div class="t-title">${t.title} <span style="color:var(--one-yellow)">(+${formatMoney(t.reward)} UZS)</span></div>
+      <div class="task-icon-box">${icon}</div>
+      <div class="task-body">
+        <div class="t-top-row">
+          <span class="t-title">${t.title}</span>
+          <span class="t-reward">+${formatMoney(t.reward)} UZS</span>
+        </div>
         <div class="t-bar-wrap">
           <div class="t-bar ${t.completed ? 'complete' : ''}" style="width: ${pct}%"></div>
         </div>
-        <div class="t-prog-lbl">${t.current_val} / ${t.target_val}</div>
+        <div class="t-meta-row">
+          <span class="t-prog-lbl">${t.current_val} / ${t.target_val}</span>
+          <span class="t-pct-lbl">${pct}%</span>
+        </div>
       </div>
-      <button class="t-btn" ${t.claimed ? "disabled" : (!t.completed ? "disabled" : "")} data-key="${t.task_key}">
-        ${t.claimed ? "OLINGAN" : (t.completed ? "YIG'ISH" : "BAJARILMOQDA")}
-      </button>
+      <div class="task-action">
+        ${t.claimed ? 
+          `<button class="t-btn btn-claimed" disabled>✅ OLINDI</button>` : 
+          (t.completed ? 
+            `<button class="t-btn btn-claim-ready" data-key="${t.task_key}">⚡ YIG'ISH</button>` : 
+            `<button class="t-btn btn-in-progress" disabled>⏳ ${pct}%</button>`
+          )
+        }
+      </div>
     `;
 
-    const btn = div.querySelector(".t-btn");
-    if (t.completed && !t.claimed) {
+    const btn = div.querySelector(".btn-claim-ready");
+    if (btn) {
       btn.addEventListener("click", () => claimTaskReward(t.task_key));
     }
 
     container.appendChild(div);
   });
 
+  const doneCountEl = document.getElementById("tasksDoneCount");
+  if (doneCountEl) doneCountEl.textContent = `${doneCount} / ${tasks.length}`;
+
+  const totalRewardEl = document.getElementById("tasksTotalReward");
+  if (totalRewardEl) totalRewardEl.textContent = `${formatMoney(totalReward)} UZS`;
+
+  const claimAllBtn = document.getElementById("claimAllTasksBtn");
+  if (claimAllBtn) {
+    if (claimableCount > 1) {
+      claimAllBtn.style.display = "inline-block";
+      claimAllBtn.textContent = `BARCHASINI YIG'ISH (${claimableCount})`;
+    } else {
+      claimAllBtn.style.display = "none";
+    }
+  }
+
   const badge = document.getElementById("tasksBadge");
-  badge.textContent = claimableCount;
-  badge.style.display = claimableCount > 0 ? "inline-block" : "none";
+  if (badge) {
+    badge.textContent = claimableCount;
+    badge.style.display = claimableCount > 0 ? "inline-block" : "none";
+  }
 }
+
+document.getElementById("claimAllTasksBtn")?.addEventListener("click", async () => {
+  audio.play("win");
+  triggerHaptic("success");
+  fx.confetti();
+
+  const res = await apiFetch("/api/claim-all-tasks", "POST", { user_id: USER_ID });
+  if (res?.ok) {
+    updateBalanceUI(res.balance);
+    renderTasksList(res.tasks || []);
+    if (res.seconds_left) startTasksCountdownTimer(res.seconds_left);
+    showToast(`🎉 Barcha mukofotlar olindi: +${formatMoney(res.reward)} UZS!`, true);
+  }
+});
 
 async function claimTaskReward(taskKey) {
   audio.play("win");
@@ -595,6 +705,10 @@ async function claimTaskReward(taskKey) {
   if (res?.ok) {
     updateBalanceUI(res.balance);
     renderTasksList(res.tasks || []);
+    if (res.seconds_left) startTasksCountdownTimer(res.seconds_left);
+    showToast(`🎉 +${formatMoney(res.reward)} UZS hisobingizga qo'shildi!`, true);
+  } else {
+    showToast(`❌ ${res.error || "Xatolik"}`, false);
   }
 }
 
@@ -604,6 +718,11 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
+
+    if (appState.cr.animId && appState.cr.state === "idle") {
+      cancelAnimationFrame(appState.cr.animId);
+      appState.cr.animId = null;
+    }
 
     btn.classList.add("active");
     const tabId = `tab-${btn.dataset.tab}`;
@@ -619,6 +738,18 @@ function openGameView(viewId) {
 
   const view = document.getElementById(viewId);
   if (view) view.style.display = "flex";
+
+  if (viewId === "view-crash") {
+    initCrashCanvas();
+    if (!appState.cr.animId) {
+      appState.cr.animId = requestAnimationFrame(crashLoop);
+    }
+  } else {
+    if (appState.cr.animId && appState.cr.state === "idle") {
+      cancelAnimationFrame(appState.cr.animId);
+      appState.cr.animId = null;
+    }
+  }
 }
 
 function returnToLobby() {
@@ -626,6 +757,11 @@ function returnToLobby() {
   document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
   document.getElementById("tab-lobby").classList.add("active");
   document.querySelector('.tab-btn[data-tab="lobby"]').classList.add("active");
+
+  if (appState.cr.animId && appState.cr.state === "idle") {
+    cancelAnimationFrame(appState.cr.animId);
+    appState.cr.animId = null;
+  }
 }
 
 document.getElementById("homeLogoBtn").addEventListener("click", returnToLobby);
@@ -1341,6 +1477,11 @@ function drawCrashGrid(w, h) {
 
 function crashLoop(now) {
   if (!crashCtx) return;
+  const crashView = document.getElementById("view-crash");
+  if (crashView && crashView.style.display === "none" && appState.cr.state === "idle") {
+    appState.cr.animId = null;
+    return;
+  }
   const w = crashCanvas.width;
   const h = crashCanvas.height;
   crashCtx.clearRect(0, 0, w, h);

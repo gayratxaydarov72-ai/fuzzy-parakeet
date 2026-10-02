@@ -456,9 +456,31 @@
     </div>
 
     <div class="tab-content" id="tab-tasks">
-      <div class="section-card">
-        <div class="sec-title">🎯 KUNLIK VAZIFALAR</div>
-        <div class="sec-desc">Vazifalarni bajaring va har kuni qo'shimcha bepul balans yig'ing!</div>
+      <div class="section-card tasks-card">
+        <div class="tasks-cycle-banner">
+          <div class="cycle-left">
+            <span class="cycle-badge">⚡ 24 SOATLIK SIKL</span>
+            <div class="cycle-timer-box">
+              <span class="timer-icon">⏳</span>
+              <span class="timer-label">Yangilanishga qoldi:</span>
+              <span class="timer-digits" id="taskResetTimer">--:--:--</span>
+            </div>
+          </div>
+          <button class="btn-claim-all" id="claimAllTasksBtn" style="display: none;">BARCHASINI YIG'ISH</button>
+        </div>
+
+        <div class="tasks-summary-bar">
+          <div class="sum-item">
+            <span class="sum-val" id="tasksDoneCount">0 / 5</span>
+            <span class="sum-lbl">Bajarilgan</span>
+          </div>
+          <div class="sum-item">
+            <span class="sum-val" id="tasksTotalReward">0 UZS</span>
+            <span class="sum-lbl">Jami bonus</span>
+          </div>
+        </div>
+
+        <div class="sec-desc">Vazifalar har 24 soatda avtomatik almashadi. Mukofotlarni faqat ushbu Mini App ichida yig'ib olishingiz mumkin!</div>
         <div class="tasks-list" id="tasksList"></div>
       </div>
     </div>

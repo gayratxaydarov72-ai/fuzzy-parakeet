@@ -4,7 +4,14 @@ import os
 import sys
 import json
 import urllib.parse
+from datetime import datetime, timedelta, time as dt_time
 import database
+
+def get_seconds_until_midnight():
+    now = datetime.now()
+    tomorrow = now.date() + timedelta(days=1)
+    midnight = datetime.combine(tomorrow, dt_time.min)
+    return max(0, int((midnight - now).total_seconds()))
 
 if sys.platform == "win32":
     try:
@@ -75,7 +82,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             user = database.get_or_create_user(uid, first_name, username, ref_id)
             tasks = database.get_user_tasks(uid)
-            return self.send_json({"ok": True, "user": user, "tasks": tasks})
+            return self.send_json({"ok": True, "user": user, "tasks": tasks, "seconds_left": get_seconds_until_midnight()})
 
         elif path == "/api/tasks":
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
@@ -86,7 +93,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
 
             tasks = database.get_user_tasks(uid)
-            return self.send_json({"ok": True, "tasks": tasks})
+            return self.send_json({"ok": True, "tasks": tasks, "seconds_left": get_seconds_until_midnight()})
 
         elif path == "/api/history":
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
@@ -141,9 +148,22 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             if ok:
                 user = database.get_or_create_user(uid)
                 tasks = database.get_user_tasks(uid)
-                return self.send_json({"ok": True, "reward": res, "balance": user["balance"], "tasks": tasks})
+                return self.send_json({"ok": True, "reward": res, "balance": user["balance"], "tasks": tasks, "seconds_left": get_seconds_until_midnight()})
             else:
                 return self.send_json({"ok": False, "error": res}, status=400)
+
+        elif path == "/api/claim-all-tasks":
+            uid = safe_int(data.get("user_id"), 999999)
+            if uid <= 0:
+                uid = 999999
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
+            ok, total_reward = database.claim_all_tasks(uid)
+            user = database.get_or_create_user(uid)
+            tasks = database.get_user_tasks(uid)
+            return self.send_json({"ok": True, "reward": total_reward, "balance": user["balance"], "tasks": tasks, "seconds_left": get_seconds_until_midnight()})
 
         elif path == "/api/game-result":
             uid = safe_int(data.get("user_id"), 999999)
