@@ -364,6 +364,26 @@ button, input, select, textarea {
   border: 1px solid #b85706;
 }
 
+.mines-thumb {
+  background: linear-gradient(135deg, #09405e, #0a1f2e);
+  border: 1px solid #14628a;
+}
+
+.thimbles-thumb {
+  background: linear-gradient(135deg, #5c450a, #2a2005);
+  border: 1px solid #8c6a12;
+}
+
+.dice-thumb {
+  background: linear-gradient(135deg, #611e38, #2a0b17);
+  border: 1px solid #8e2b52;
+}
+
+.wheel-thumb {
+  background: linear-gradient(135deg, #4a154b, #1b092b);
+  border: 1px solid #9b2fb8;
+}
+
 .game-ico {
   font-size: 26px;
 }
@@ -2304,7 +2324,169 @@ button, input, select, textarea {
   100% { box-shadow: 0 0 10px rgba(255, 199, 0, 0.15); }
 }
 
-.game-arena-view, .section-card, .cell, .mine-tile, .thimble-cup, .dice-cube {
+.game-arena-view, .section-card, .cell, .mine-tile, .thimble-cup, .dice-cube, .wheel-canvas-container {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+
+/* ==========================================================================
+   WHEEL OF FORTUNE (LUCKY WHEEL) STYLES
+   ========================================================================== */
+.wheel-stage-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background: radial-gradient(circle at 50% 50%, #1a1a36 0%, #0c0c1c 100%);
+  gap: clamp(6px, 1.4vh, 12px);
+  overflow: hidden;
+  position: relative;
+}
+
+.wheel-history-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(10, 10, 24, 0.7);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 28px;
+  max-width: 90%;
+  overflow-x: auto;
+}
+
+.wh-hist-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.wh-hist-pill.gold {
+  background: linear-gradient(135deg, #ffd700, #ff9900);
+  color: #1a0f00;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+.wh-hist-pill.cyan {
+  background: linear-gradient(135deg, #00cec9, #0984e3);
+  color: #ffffff;
+}
+
+.wh-hist-pill.purple {
+  background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+  color: #ffffff;
+}
+
+.wh-hist-pill.green {
+  background: linear-gradient(135deg, #55efc4, #00b894);
+  color: #0b2e21;
+}
+
+.wh-hist-pill.dark {
+  background: rgba(255, 255, 255, 0.1);
+  color: #8395a7;
+}
+
+.wheel-canvas-container {
+  position: relative;
+  width: clamp(260px, 68vw, 320px);
+  height: clamp(260px, 68vw, 320px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#wheelCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 0 16px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 8px rgba(255, 215, 0, 0.2));
+  border-radius: 50%;
+}
+
+.wheel-pointer {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 38px;
+  z-index: 10;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.8));
+  transform-origin: 50% 10%;
+  transition: transform 0.08s ease;
+}
+
+.wheel-pointer.tick {
+  transform: translateX(-50%) rotate(-18deg);
+}
+
+.wheel-pointer-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wheel-center-cap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(48px, 12vw, 60px);
+  height: clamp(48px, 12vw, 60px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff1b8 0%, #ffd700 40%, #b8860b 80%, #684803 100%);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.8), inset 0 2px 4px rgba(255, 255, 255, 0.8), 0 0 10px rgba(255, 215, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8;
+  cursor: pointer;
+  border: 2px solid #5a3c05;
+}
+
+.cap-gem {
+  font-size: clamp(18px, 4.5vw, 24px);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+}
+
+.wheel-result-msg {
+  font-size: clamp(12px, 2.5vw, 14px);
+  font-weight: 700;
+  color: #a4b0be;
+  text-align: center;
+  min-height: 22px;
+  padding: 0 10px;
+  transition: color 0.2s;
+}
+
+.wheel-result-msg.win {
+  color: #2ed573;
+  text-shadow: 0 0 8px rgba(46, 213, 115, 0.6);
+  font-weight: 900;
+  animation: pulse-pop 0.35s ease;
+}
+
+.wheel-result-msg.lose {
+  color: #ff4757;
+  text-shadow: 0 0 8px rgba(255, 71, 87, 0.5);
+}
+
+.wheel-status-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+

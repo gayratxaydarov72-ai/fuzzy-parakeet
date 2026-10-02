@@ -140,6 +140,14 @@ const appState = {
     rolling: false,
     dice1: 1,
     dice2: 6
+  },
+
+  wh: {
+    bet: 5000,
+    spinning: false,
+    angle: 0,
+    history: [25.0, 2.0, 3.0, 0, 1.5],
+    animId: null
   }
 };
 
@@ -886,7 +894,8 @@ function openGameView(viewId) {
     "view-crash": "crBetInput",
     "view-mines": "mnBetInput",
     "view-thimbles": "thBetInput",
-    "view-dice": "dcBetInput"
+    "view-dice": "dcBetInput",
+    "view-wheel": "whBetInput"
   };
   const inputId = betInputMap[viewId];
   if (inputId) {
@@ -933,6 +942,7 @@ document.getElementById("backFromCrash").addEventListener("click", returnToLobby
 document.getElementById("backFromMines")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromThimbles")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromDice")?.addEventListener("click", returnToLobby);
+document.getElementById("backFromWheel")?.addEventListener("click", returnToLobby);
 
 document.getElementById("bannerRefBtn").addEventListener("click", () => {
   document.querySelector('.tab-btn[data-tab="referral"]').click();
@@ -977,6 +987,13 @@ document.querySelectorAll('.game-card[data-game="dice"]').forEach(c => {
   c.addEventListener("click", () => {
     openGameView("view-dice");
     renderDicePips(1, 6);
+  });
+});
+
+document.querySelectorAll('.game-card[data-game="wheel"]').forEach(c => {
+  c.addEventListener("click", () => {
+    openGameView("view-wheel");
+    initWheelGame();
   });
 });
 
@@ -2819,13 +2836,424 @@ async function finishDiceGame(won, mult, sum) {
   setTimeout(() => {
     appState.dc.rolling = false;
     const rollBtn = document.getElementById("diceRollBtn");
-    rollBtn.disabled = false;
-    rollBtn.textContent = "TOSHLARNI TASHLASH";
+    if (rollBtn) {
+      rollBtn.disabled = false;
+      rollBtn.textContent = "TOSHLARNI TASHLASH";
+    }
   }, 1200);
 }
+
+/* ==========================================================================
+   🎡 LUCKY WHEEL (OMAD G'ILDIRAGI) IMPLEMENTATION
+   ========================================================================== */
+
+const WHEEL_SECTORS = [
+  { mult: 0, label: "0x", icon: "💀", color1: "#2d3436", color2: "#1e272e", text: "#b2bec3" },
+  { mult: 1.5, label: "1.5x", icon: "🍏", color1: "#00b894", color2: "#008f68", text: "#ffffff" },
+  { mult: 2.0, label: "2.0x", icon: "💎", color1: "#0984e3", color2: "#0652dd", text: "#ffffff" },
+  { mult: 0, label: "0x", icon: "💀", color1: "#2d3436", color2: "#1e272e", text: "#b2bec3" },
+  { mult: 3.0, label: "3.0x", icon: "⚡", color1: "#6c5ce7", color2: "#4834d4", text: "#ffffff" },
+  { mult: 1.2, label: "1.2x", icon: "🍀", color1: "#00cec9", color2: "#00a8a3", text: "#ffffff" },
+  { mult: 5.0, label: "5.0x", icon: "🔥", color1: "#e17055", color2: "#d35400", text: "#ffffff" },
+  { mult: 0, label: "0x", icon: "💀", color1: "#2d3436", color2: "#1e272e", text: "#b2bec3" },
+  { mult: 10.0, label: "10x", icon: "👑", color1: "#fdcb6e", color2: "#e67e22", text: "#1a0f00" },
+  { mult: 25.0, label: "25x", icon: "⭐", color1: "#d63031", color2: "#962d22", text: "#ffffff", jackpot: true }
+];
+
+let wheelCanvas = null;
+let wheelCtx = null;
+
+function initWheelCanvas() {
+  wheelCanvas = document.getElementById("wheelCanvas");
+  if (!wheelCanvas) return;
+  wheelCtx = wheelCanvas.getContext("2d");
+
+  const dpr = window.devicePixelRatio || 1;
+  const size = 340;
+  wheelCanvas.width = size * dpr;
+  if (typeof wheelCtx.scale === "function") {
+    wheelCtx.scale(dpr, dpr);
+  }
+
+  drawWheel(appState.wh.angle, null);
+}
+
+function initWheelGame() {
+  initWheelCanvas();
+  renderWheelHistory();
+}
+
+function renderWheelHistory() {
+  const bar = document.getElementById("wheelHistoryBar");
+  if (!bar) return;
+  bar.innerHTML = "";
+  (appState.wh.history || []).slice(0, 5).forEach(m => {
+    const pill = document.createElement("span");
+    let cls = "dark";
+    if (m >= 25) cls = "gold";
+    else if (m >= 10) cls = "gold";
+    else if (m >= 3) cls = "purple";
+    else if (m >= 2) cls = "cyan";
+    else if (m > 0) cls = "green";
+    pill.className = `wh-hist-pill ${cls}`;
+    pill.textContent = m > 0 ? `${m}x` : "0x";
+    bar.appendChild(pill);
+  });
+}
+
+function drawWheel(angle, highlightIndex = null) {
+  if (!wheelCtx || !wheelCanvas) return;
+  const size = 340;
+  const center = size / 2;
+  const radius = center - 8;
+  const numSectors = WHEEL_SECTORS.length;
+  const sliceAngle = (2 * Math.PI) / numSectors;
+
+  wheelCtx.clearRect(0, 0, size, size);
+
+  // Outer gold rim
+  wheelCtx.save();
+  wheelCtx.beginPath();
+  wheelCtx.arc(center, center, radius, 0, 2 * Math.PI);
+  let rimGrad = "#ffd700";
+  if (typeof wheelCtx.createRadialGradient === "function") {
+    const rg = wheelCtx.createRadialGradient(center, center, radius - 14, center, center, radius);
+    rg.addColorStop(0, "#b8860b");
+    rg.addColorStop(0.5, "#ffd700");
+    rg.addColorStop(1, "#5c4308");
+    rimGrad = rg;
+  }
+  wheelCtx.fillStyle = rimGrad;
+  wheelCtx.shadowColor = "rgba(0, 0, 0, 0.6)";
+  wheelCtx.shadowBlur = 10;
+  wheelCtx.fill();
+  wheelCtx.restore();
+
+  // Draw sectors
+  wheelCtx.save();
+  wheelCtx.translate(center, center);
+  wheelCtx.rotate(angle);
+
+  for (let i = 0; i < numSectors; i++) {
+    const s = WHEEL_SECTORS[i];
+    const startA = i * sliceAngle;
+    const endA = startA + sliceAngle;
+
+    wheelCtx.beginPath();
+    wheelCtx.moveTo(0, 0);
+    wheelCtx.arc(0, 0, radius - 10, startA, endA);
+    wheelCtx.closePath();
+
+    const midA = startA + sliceAngle / 2;
+    const gx = Math.cos(midA) * (radius - 10);
+    const gy = Math.sin(midA) * (radius - 10);
+    let grad = s.color1;
+    if (typeof wheelCtx.createLinearGradient === "function") {
+      const lg = wheelCtx.createLinearGradient(0, 0, gx, gy);
+      lg.addColorStop(0, s.color1);
+      lg.addColorStop(1, s.color2);
+      grad = lg;
+    }
+    wheelCtx.fillStyle = grad;
+    wheelCtx.fill();
+
+    wheelCtx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+    wheelCtx.lineWidth = 1.5;
+    wheelCtx.stroke();
+
+    if (highlightIndex === i) {
+      wheelCtx.save();
+      wheelCtx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      wheelCtx.fill();
+      wheelCtx.strokeStyle = "#ffd700";
+      wheelCtx.lineWidth = 3;
+      wheelCtx.stroke();
+      wheelCtx.restore();
+    }
+
+    wheelCtx.save();
+    wheelCtx.rotate(midA);
+    wheelCtx.textAlign = "right";
+    wheelCtx.textBaseline = "middle";
+
+    wheelCtx.fillStyle = s.text;
+    wheelCtx.font = s.jackpot ? "bold 15px 'Roboto', sans-serif" : "bold 13px 'Roboto', sans-serif";
+    wheelCtx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    wheelCtx.shadowBlur = 4;
+    wheelCtx.fillText(`${s.icon} ${s.label}`, radius - 22, 0);
+
+    wheelCtx.restore();
+  }
+
+  // Pegs / Pins at perimeter
+  for (let i = 0; i < numSectors; i++) {
+    const a = i * sliceAngle;
+    const px = Math.cos(a) * (radius - 10);
+    const py = Math.sin(a) * (radius - 10);
+
+    wheelCtx.beginPath();
+    wheelCtx.arc(px, py, 3, 0, 2 * Math.PI);
+    wheelCtx.fillStyle = "#ffffff";
+    wheelCtx.shadowColor = "#ffd700";
+    wheelCtx.shadowBlur = 6;
+    wheelCtx.fill();
+  }
+
+  wheelCtx.restore();
+
+  // LED Bulbs around the static outer rim
+  const numLeds = 20;
+  const ledRadius = radius - 4.5;
+  const timeSec = Date.now() / 350;
+  for (let i = 0; i < numLeds; i++) {
+    const a = (i / numLeds) * Math.PI * 2;
+    const lx = center + Math.cos(a) * ledRadius;
+    const ly = center + Math.sin(a) * ledRadius;
+    const isOn = (Math.floor(timeSec + i)) % 2 === 0;
+
+    wheelCtx.beginPath();
+    wheelCtx.arc(lx, ly, 2.5, 0, 2 * Math.PI);
+    wheelCtx.fillStyle = isOn ? "#fff382" : "#967812";
+    if (isOn) {
+      wheelCtx.shadowColor = "#ffd700";
+      wheelCtx.shadowBlur = 6;
+    } else {
+      wheelCtx.shadowBlur = 0;
+    }
+    wheelCtx.fill();
+  }
+}
+
+async function spinWheel() {
+  if (appState.wh.spinning) return;
+
+  const betVal = getValidatedBet("whBetInput");
+  if (!betVal) return;
+
+  appState.wh.bet = betVal;
+  appState.wh.spinning = true;
+  updateBalanceUI(appState.balance - betVal);
+
+  audio.play("click");
+  triggerHaptic("medium");
+
+  const spinBtn = document.getElementById("whSpinBtn");
+  if (spinBtn) {
+    spinBtn.disabled = true;
+    spinBtn.textContent = "AYLANMOQDA... 🎡";
+  }
+
+  const msgEl = document.getElementById("wheelResultMsg");
+  if (msgEl) {
+    msgEl.className = "wheel-result-msg";
+    msgEl.textContent = "Omadingiz sinovdan o'tmoqda...";
+  }
+
+  // Determine winning sector
+  const numSectors = WHEEL_SECTORS.length;
+  const zeroIndices = WHEEL_SECTORS.map((s, idx) => s.mult === 0 ? idx : -1).filter(i => i !== -1);
+  const winIndices = WHEEL_SECTORS.map((s, idx) => s.mult > 0 ? idx : -1).filter(i => i !== -1);
+
+  let targetIndex = 0;
+  if (appState.evilMode) {
+    // 65% chance zero, 25% chance 1.2x, 10% other
+    const rnd = Math.random();
+    if (rnd < 0.65) {
+      targetIndex = zeroIndices[Math.floor(Math.random() * zeroIndices.length)];
+    } else if (rnd < 0.90) {
+      targetIndex = 5; // 1.2x
+    } else {
+      targetIndex = winIndices[Math.floor(Math.random() * winIndices.length)];
+    }
+  } else {
+    // Normal fair weights
+    const weights = [
+      14, // 0x
+      14, // 1.5x
+      12, // 2.0x
+      14, // 0x
+       9, // 3.0x
+      15, // 1.2x
+       8, // 5.0x
+      14, // 0x
+       4, // 10x
+       2  // 25x Jackpot
+    ];
+    const totalW = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * totalW;
+    for (let i = 0; i < weights.length; i++) {
+      if (r < weights[i]) {
+        targetIndex = i;
+        break;
+      }
+      r -= weights[i];
+    }
+  }
+
+  const winningSector = WHEEL_SECTORS[targetIndex];
+  const sliceAngle = (2 * Math.PI) / numSectors;
+
+  // The pointer is at 12 o'clock (angle 3*PI/2)
+  const sliceOffset = (0.25 + Math.random() * 0.5) * sliceAngle;
+  const desiredLocalAngle = targetIndex * sliceAngle + sliceOffset;
+
+  const currentAngle = appState.wh.angle;
+  const fullRotations = (5 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
+
+  const remainder = ((3 * Math.PI / 2 - desiredLocalAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  const currentMod = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  let delta = remainder - currentMod;
+  if (delta < 0) delta += 2 * Math.PI;
+
+  const totalAngle = currentAngle + fullRotations + delta;
+  const duration = 3800; // 3.8 seconds
+  const startTime = performance.now();
+  let lastSectorPassed = -1;
+
+  const pointerEl = document.getElementById("wheelPointer");
+
+  function animateSpin(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(1, elapsed / duration);
+
+    // Cubic ease-out
+    const ease = 1 - Math.pow(1 - progress, 3.8);
+    const angle = currentAngle + (totalAngle - currentAngle) * ease;
+    appState.wh.angle = angle;
+
+    // Check needle tick
+    const localTop = ((3 * Math.PI / 2 - angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    const currentSec = Math.floor(localTop / sliceAngle);
+    if (currentSec !== lastSectorPassed) {
+      lastSectorPassed = currentSec;
+      audio.play("tick");
+      triggerHaptic("selectionChanged");
+      if (pointerEl) {
+        pointerEl.classList.add("tick");
+        setTimeout(() => pointerEl.classList.remove("tick"), 40);
+      }
+    }
+
+    drawWheel(angle, progress === 1 ? targetIndex : null);
+
+    if (progress < 1) {
+      appState.wh.animId = requestAnimationFrame(animateSpin);
+    } else {
+      finishSpin(winningSector, targetIndex);
+    }
+  }
+
+  appState.wh.animId = requestAnimationFrame(animateSpin);
+}
+
+async function finishSpin(sector, sectorIndex) {
+  const mult = sector.mult;
+  const winAmount = Math.round(appState.wh.bet * mult);
+  const msgEl = document.getElementById("wheelResultMsg");
+
+  // Add to history
+  appState.wh.history.unshift(mult);
+  renderWheelHistory();
+
+  if (mult > 0) {
+    updateBalanceUI(appState.balance + winAmount);
+
+    audio.play("win");
+    triggerHaptic("heavy");
+
+    const canvasEl = document.getElementById("wheelCanvas");
+    if (canvasEl) {
+      const rect = canvasEl.getBoundingClientRect();
+      particleFx.explode(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
+
+    if (msgEl) {
+      msgEl.className = "wheel-result-msg win";
+      msgEl.textContent = `🎉 TABRIKLAYMIZ! YUTUQ: +${formatMoney(winAmount)} UZS (${mult}x)`;
+    }
+    showToast(`🎉 YUTUQ: +${formatMoney(winAmount)} UZS (${mult}x)`, true);
+
+    const res = await apiFetch("/api/game-result", "POST", {
+      user_id: USER_ID,
+      game_name: "wheel",
+      bet: appState.wh.bet,
+      win: winAmount,
+      multiplier: mult
+    });
+    if (res?.ok) {
+      if (res.provably_hash) appState.lastHash = res.provably_hash;
+      if (res.tasks) renderTasksList(res.tasks);
+    }
+  } else {
+    audio.play("boom");
+    triggerHaptic("light");
+    triggerScreenShake();
+
+    if (msgEl) {
+      msgEl.className = "wheel-result-msg lose";
+      msgEl.textContent = `💥 Omadingiz kelmadi (0x). Keyingi safar albatta yutasiz!`;
+    }
+    showToast(`💥 Omadsiz sektor (0x)! -${formatMoney(appState.wh.bet)} UZS`, false);
+
+    const res = await apiFetch("/api/game-result", "POST", {
+      user_id: USER_ID,
+      game_name: "wheel",
+      bet: appState.wh.bet,
+      win: 0,
+      multiplier: 0
+    });
+    if (res?.ok) {
+      if (res.provably_hash) appState.lastHash = res.provably_hash;
+      if (res.tasks) renderTasksList(res.tasks);
+    }
+  }
+
+  setTimeout(() => {
+    appState.wh.spinning = false;
+    const spinBtn = document.getElementById("whSpinBtn");
+    if (spinBtn) {
+      spinBtn.disabled = false;
+      spinBtn.textContent = "AYLANTIRISH 🎡";
+    }
+  }, 1000);
+}
+
+// Lucky Wheel Bet controls
+document.getElementById("whMinus")?.addEventListener("click", () => {
+  if (appState.wh.spinning) return;
+  adjustBetInput("whBetInput", "minus");
+});
+document.getElementById("whPlus")?.addEventListener("click", () => {
+  if (appState.wh.spinning) return;
+  adjustBetInput("whBetInput", "plus");
+});
+document.getElementById("whHalf")?.addEventListener("click", () => {
+  if (appState.wh.spinning) return;
+  adjustBetInput("whBetInput", "half");
+});
+document.getElementById("whDouble")?.addEventListener("click", () => {
+  if (appState.wh.spinning) return;
+  adjustBetInput("whBetInput", "double");
+});
+document.getElementById("whMax")?.addEventListener("click", () => {
+  if (appState.wh.spinning) return;
+  adjustBetInput("whBetInput", "max");
+});
+
+document.querySelectorAll("#wheelBettingBox .b-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    if (appState.wh.spinning) return;
+    const val = parseInt(chip.getAttribute("data-v"), 10);
+    setBetChip("whBetInput", val);
+  });
+});
+
+document.getElementById("whSpinBtn")?.addEventListener("click", spinWheel);
+document.getElementById("wheelCenterCap")?.addEventListener("click", spinWheel);
 
 initAppData();
 renderKamikazeBoard();
 renderAppleBoard();
 renderMinesBoard();
 renderDicePips(1, 6);
+initWheelCanvas();

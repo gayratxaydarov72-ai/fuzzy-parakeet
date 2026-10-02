@@ -829,14 +829,15 @@ async def command_start_handler(message: types.Message, command: CommandObject, 
     welcome_text = (
         f"🔥 <b>ASSALOMU ALAYKUM, {first_name.upper()}!</b>\n\n"
         f"🎮 <b>NVINDIA GAMES</b> — Rasmiy Telegram Mini App kazino va o'yinlar portaliga xush kelibsiz!\n\n"
-        f"Bizning platformada 1xBet standartidagi 6 ta eng mashhur va ommabop o'yin to'liq real vaqt rejimida mavjud:\n\n"
-        f"🕹 <b>TOP 6 TA O'YINLARIMIZ:</b>\n"
+        f"Bizning platformada 1xBet standartidagi 7 ta eng mashhur va ommabop o'yin to'liq real vaqt rejimida mavjud:\n\n"
+        f"🕹 <b>TOP 7 TA O'YINLARIMIZ:</b>\n"
         f"• 🛩 <b>Kamikaze</b> — 10 qavatli minora! 1, 2 yoki 3 ta bomba tanlang (x1.23 dan x9346.10 gacha)!\n"
         f"• 🍎 <b>Apple of Fortune</b> — Mashhur olma o'yini! Zaharli va oltin olmalar (x1.23 dan x349.57 gacha)!\n"
         f"• 🚀 <b>Aviator Crash</b> — 5 sekundlik start taymeri va to'liq 1-ga-1 1xBet parvozi!\n"
         f"• 💎 <b>Mines NVINDIA</b> — 5x5 katakli kiber mina maydoni! 1 dan 20 gacha bomba tanlang!\n"
         f"• 🪚 <b>Thimbles</b> — 3 ta oltin stakan va qizil rubin to'p! 1 to'p (x2.80) yoki 2 to'p (x1.40)!\n"
-        f"• 🎲 <b>Under / Over 7</b> — 3D suyaklar! 7 dan kam (x2.10), 7 ga teng (x5.20), 7 dan ko'p (x2.10)!\n\n"
+        f"• 🎲 <b>Under / Over 7</b> — 3D suyaklar! 7 dan kam (x2.10), 7 ga teng (x5.20), 7 dan ko'p (x2.10)!\n"
+        f"• 🎡 <b>Lucky Wheel</b> — Omad g'ildiragi! 10 xil sektor, x1.2 dan x25.0 JACKPOT gacha yutuqlar!\n\n"
         f"💰 <b>Sizning balansingiz:</b> <b>{user['balance']:,} UZS</b>\n"
         f"🎁 <b>Boshlang'ich bonus:</b> Hisobingizga bepul 10 000 UZS berildi!\n\n"
         f"👥 <b>REFERAL DASTURI (+2 000 UZS):</b>\n"
@@ -849,6 +850,7 @@ async def command_start_handler(message: types.Message, command: CommandObject, 
         f"• <code>/promo KAMIKAZE</code> — <b>+3 000 UZS</b>\n"
         f"• <code>/promo MINES</code> — <b>+3 000 UZS</b>\n"
         f"• <code>/promo DICE</code> — <b>+2 500 UZS</b>\n"
+        f"• <code>/promo WHEEL</code> — <b>+3 000 UZS</b>\n"
         f"• <code>/promo APPLE</code> — <b>+2 000 UZS</b>\n"
         f"• <code>/promo BONUS</code> — <b>+1 500 UZS</b>\n\n"
         f"🎯 <b>KUNLIK VAZIFALAR:</b>\n"
@@ -963,7 +965,8 @@ async def help_cmd(message: types.Message, bot: Bot):
         "3. <b>Aviator / Crash:</b> 5 sekundlik start taymeri, so'ngra samolyot havoga ko'tariladi. Koeffitsiyent o'sib boradi. Samolyot uchib ketishidan oldin yutuqni oling!\n"
         "4. <b>Mines NVINDIA:</b> 5x5 katakli kiber maydon. Bombalar sonini tanlab olmoslarni oching!\n"
         "5. <b>Thimbles:</b> 3 ta stakan va to'plar aralashadi. 1 to'p (x2.80) yoki 2 to'p (x1.40)!\n"
-        "6. <b>Under / Over 7:</b> 3D toshlar yig'indisini taxmin qiling (x2.10 dan x5.20 gacha)!\n\n"
+        "6. <b>Under / Over 7:</b> 3D toshlar yig'indisini taxmin qiling (x2.10 dan x5.20 gacha)!\n"
+        "7. <b>Lucky Wheel:</b> Omad g'ildiragi! 10 xil ko'paytma va x25.0 gacha JACKPOT yutuqlari!\n\n"
         "👥 <b>Do'stlarni taklif qilish:</b>\n"
         "Har bir do'st uchun hisobingizga +2 000 UZS qo'shiladi.\n\n"
         "🛡️ <b>Provably Fair:</b>\n"
@@ -1062,13 +1065,14 @@ async def rules_callback(call: types.CallbackQuery, bot: Bot):
         await call.answer("Hisobingiz bloklangan!", show_alert=True)
         return
     text = (
-        "📖 <b>6 TA O'YINNING TO'LIQ QOIDALARI:</b>\n\n"
+        "📖 <b>7 TA O'YINNING TO'LIQ QOIDALARI:</b>\n\n"
         "1. 🛩 <b>Kamikaze:</b> 10 qavatdan iborat samolyot minorasi. Bombalar sonini (1, 2, 3) tanlang. Har safar xavfsiz katak koeffitsiyentni oshiradi. Istalgan vaqt 'YUTUQNI OLISH' mumkin.\n\n"
         "2. 🍎 <b>Apple of Fortune:</b> 10 qator, har birida 5 ta bochka. Qizil butun olma yutuq, kemirilgan zaharli olma esa mag'lubiyat keltiradi.\n\n"
         "3. 🚀 <b>Aviator Crash:</b> 5 sekundlik start taymeri. Samolyot havoga ko'tariladi va multiplikator uzluksiz o'sadi. Samolyot uchib ketishidan oldin yutuqni naqdlashtiring!\n\n"
         "4. 💎 <b>Mines NVINDIA:</b> 5x5 katakli (25 ta katak) mina maydoni. 1 dan 20 gacha mina tanlang. Olmoslarni oching va istalgan vaqtda yutuqni oling!\n\n"
         "5. 🪚 <b>Thimbles:</b> 3 ta oltin stakan aralashtiriladi. 1 ta to'p (x2.80) yoki 2 ta to'p (x1.40) rejimi. To'p yashiringan stakanni toping!\n\n"
-        "6. 🎲 <b>Under / Over 7:</b> Ikkita 3D suyak tashlanadi. Yig'indini taxmin qiling: 7 dan kam (x2.10), 7 ga teng (x5.20) yoki 7 dan ko'p (x2.10)!"
+        "6. 🎲 <b>Under / Over 7:</b> Ikkita 3D suyak tashlanadi. Yig'indini taxmin qiling: 7 dan kam (x2.10), 7 ga teng (x5.20) yoki 7 dan ko'p (x2.10)!\n\n"
+        "7. 🎡 <b>Lucky Wheel:</b> Omad g'ildiragini aylantiring. 10 ta rang-barang sektor va x25.0 gacha JACKPOT yutuqlarini qo'lga kiriting!"
     )
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()

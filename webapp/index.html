@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.1">
+  <link rel="stylesheet" href="style.css?v=3.2">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -119,6 +119,18 @@
           <div class="game-info">
             <div class="g-title">UNDER / OVER 7</div>
             <div class="g-sub">3D suyaklar va 7 dan katta/kichik</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="wheel">
+          <div class="game-thumb wheel-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><radialGradient id="gWheelRim" cx="50%" cy="50%" r="50%"><stop offset="60%" stop-color="#ffd700"/><stop offset="100%" stop-color="#b8860b"/></radialGradient><linearGradient id="gSpoke" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff7675"/><stop offset="50%" stop-color="#0984e3"/><stop offset="100%" stop-color="#00b894"/></linearGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.4)" stroke-width="1.2"/><circle cx="18" cy="18" r="14" fill="none" stroke="url(#gWheelRim)" stroke-width="2.5"/><circle cx="18" cy="18" r="12" fill="none" stroke="url(#gSpoke)" stroke-width="3" stroke-dasharray="7 5.5"/><circle cx="18" cy="18" r="4.5" fill="#ffd700" stroke="#b8860b" stroke-width="1"/><circle cx="18" cy="18" r="2" fill="#d63031"/><polygon points="18,1 21,7 15,7" fill="#ffd700"/></svg></span>
+            <span class="rt-tag">x25.0 JACKPOT</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">LUCKY WHEEL</div>
+            <div class="g-sub">Omad g'ildiragi va 25x gacha yutuq</div>
             <button class="play-btn">O'YNASH</button>
           </div>
         </div>
@@ -452,6 +464,66 @@
           </div>
           <button class="btn-play-game" id="diceRollBtn">TOSHLARNI TASHLASH</button>
         </div>
+    </div>
+
+    <div class="game-arena-view" id="view-wheel" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromWheel">⬅ Orqaga</button>
+        <span class="arena-title">LUCKY WHEEL</span>
+        <div class="wheel-status-badge" id="wheelStatusBadge">x25.0 JACKPOT</div>
+      </div>
+      <div class="wheel-stage-wrap">
+        <div class="wheel-history-bar" id="wheelHistoryBar">
+          <span class="wh-hist-pill gold">25.0x</span>
+          <span class="wh-hist-pill cyan">2.0x</span>
+          <span class="wh-hist-pill purple">3.0x</span>
+          <span class="wh-hist-pill dark">0x</span>
+          <span class="wh-hist-pill green">1.5x</span>
+        </div>
+        <div class="wheel-canvas-container" id="wheelCanvasContainer">
+          <div class="wheel-pointer" id="wheelPointer">
+            <svg viewBox="0 0 24 32" class="wheel-pointer-svg">
+              <defs>
+                <linearGradient id="ptrGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fff099"/>
+                  <stop offset="50%" stop-color="#f1c40f"/>
+                  <stop offset="100%" stop-color="#d35400"/>
+                </linearGradient>
+              </defs>
+              <polygon points="12,30 2,4 22,4" fill="url(#ptrGold)" stroke="#962d22" stroke-width="1.5"/>
+              <circle cx="12" cy="7" r="3" fill="#ffffff" opacity="0.8"/>
+            </svg>
+          </div>
+          <canvas id="wheelCanvas" width="340" height="340"></canvas>
+          <div class="wheel-center-cap" id="wheelCenterCap">
+            <div class="cap-gem">💎</div>
+          </div>
+        </div>
+        <div class="wheel-result-msg" id="wheelResultMsg">G'ildirakni aylantiring va omadingizni sinab ko'ring!</div>
+      </div>
+      <div class="arena-footer">
+        <div class="betting-box" id="wheelBettingBox">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="whMinus">-</button>
+              <input type="number" id="whBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="whPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="whHalf">/2</button>
+            <button class="btn-b-mod" id="whDouble">x2</button>
+            <button class="btn-b-mod" id="whMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game" id="whSpinBtn">AYLANTIRISH 🎡</button>
+        </div>
       </div>
     </div>
 
@@ -580,6 +652,6 @@
 
   </div>
 
-  <script src="game.js?v=3.1"></script>
+  <script src="game.js?v=3.2"></script>
 </body>
 </html>
