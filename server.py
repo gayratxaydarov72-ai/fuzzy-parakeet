@@ -330,14 +330,16 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             return self.send_json({"ok": True, "reward": total_reward, "balance": user["balance"], "tasks": tasks, "seconds_left": get_seconds_until_midnight()})
 
         elif path == "/api/game-result":
-            game_name = str(data.get("game_name", "kamikaze"))[:32]
+            game_name = str(data.get("game_name") or data.get("game") or "kamikaze")[:32]
             bet = max(0, min(10_000_000, safe_int(data.get("bet"), 0)))
             mult = max(0.0, min(10_000.0, safe_float(data.get("multiplier"), 0.0)))
-            raw_win = safe_int(data.get("win"), 0)
+            raw_win = safe_int(data.get("win") if data.get("win") is not None else data.get("payout"), 0)
+            if mult <= 0.0 and bet > 0 and raw_win > 0:
+                mult = round(raw_win / bet, 2)
 
             # Anti-Cheat: calculate expected max payout
             if bet > 0:
-                max_allowed_win = int(bet * mult + 10)
+                max_allowed_win = int(bet * max(mult, 1.0) + 50)
                 win = max(0, min(max_allowed_win, raw_win))
             else:
                 win = 0
