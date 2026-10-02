@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.2">
+  <link rel="stylesheet" href="style.css?v=3.3">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -131,6 +131,18 @@
           <div class="game-info">
             <div class="g-title">LUCKY WHEEL</div>
             <div class="g-sub">Omad g'ildiragi va 25x gacha yutuq</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="coinflip">
+          <div class="game-thumb coinflip-thumb">
+            <span class="game-ico"><svg viewBox="0 0 36 36" style="width:38px;height:38px"><defs><radialGradient id="gCoinFace" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#fff1a8"/><stop offset="45%" stop-color="#f1c40f"/><stop offset="85%" stop-color="#b8860b"/><stop offset="100%" stop-color="#6e4d03"/></radialGradient></defs><circle cx="18" cy="18" r="16" fill="rgba(241,196,15,0.12)" stroke="rgba(241,196,15,0.4)" stroke-width="1.2"/><circle cx="18" cy="18" r="14" fill="url(#gCoinFace)" stroke="#ffd700" stroke-width="1.5"/><circle cx="18" cy="18" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" stroke-dasharray="2 2"/><text x="18" y="21" font-size="11" font-weight="900" fill="#4d3202" text-anchor="middle" font-family="'Oswald', sans-serif">1.96x</text></svg></span>
+            <span class="rt-tag" style="background:#e74c3c;color:#fff;">🔴 LIVE PVP</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">COIN FLIP DUEL</div>
+            <div class="g-sub">Online jonli o'yinchilar & Offline tanga</div>
             <button class="play-btn">O'YNASH</button>
           </div>
         </div>
@@ -527,6 +539,107 @@
       </div>
     </div>
 
+    <div class="game-arena-view" id="view-coinflip" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromCoinflip">⬅ Orqaga</button>
+        <span class="arena-title">COIN FLIP DUEL</span>
+        <div class="cf-mode-toggle">
+          <button class="cf-tab-btn active" id="cfTabOnline" data-mode="online">🌐 ONLINE</button>
+          <button class="cf-tab-btn" id="cfTabOffline" data-mode="offline">🕹 OFFLINE</button>
+        </div>
+      </div>
+      <div class="cf-stage-container">
+        <!-- Online Round Status Bar -->
+        <div class="cf-online-bar" id="cfOnlineBar">
+          <span class="cf-round-tag" id="cfRoundTag">RAUND #1001</span>
+          <div class="cf-timer-pill" id="cfTimerPill"><span class="cf-timer-dot"></span> <span id="cfTimerText">10.0s</span></div>
+          <span class="cf-phase-text" id="cfPhaseText">STAVKALAR QABUL QILINMOQDA</span>
+        </div>
+
+        <!-- History Strip -->
+        <div class="cf-history-strip" id="cfHistoryStrip">
+          <span class="cf-h-badge heads">🦅</span>
+          <span class="cf-h-badge tails">👑</span>
+          <span class="cf-h-badge heads">🦅</span>
+          <span class="cf-h-badge heads">🦅</span>
+          <span class="cf-h-badge tails">👑</span>
+        </div>
+
+        <!-- 3D Coin Stage -->
+        <div class="cf-coin-stage">
+          <div class="cf-coin-wrapper" id="cfCoinWrapper">
+            <div class="cf-3d-coin" id="cf3dCoin">
+              <div class="cf-coin-face cf-coin-heads">
+                <div class="cf-face-inner">
+                  <div class="cf-face-icon">🦅</div>
+                  <div class="cf-face-name">BURGUT</div>
+                  <div class="cf-face-mult">x1.96</div>
+                </div>
+              </div>
+              <div class="cf-coin-face cf-coin-tails">
+                <div class="cf-face-inner">
+                  <div class="cf-face-icon">👑</div>
+                  <div class="cf-face-name">GERB</div>
+                  <div class="cf-face-mult">x1.96</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cf-result-banner" id="cfResultBanner">Tanlang va stavka qiling!</div>
+        </div>
+
+        <!-- Choice Selector -->
+        <div class="cf-choice-row">
+          <button class="cf-side-btn active" id="cfPickHeads" data-choice="heads">
+            <span class="cf-s-icon">🦅</span>
+            <span class="cf-s-name">BURGUT</span>
+            <span class="cf-s-rate">x1.96</span>
+          </button>
+          <button class="cf-side-btn" id="cfPickTails" data-choice="tails">
+            <span class="cf-s-icon">👑</span>
+            <span class="cf-s-name">GERB</span>
+            <span class="cf-s-rate">x1.96</span>
+          </button>
+        </div>
+
+        <!-- Online Live Bets Card (Only in Online mode) -->
+        <div class="cf-live-bets-card" id="cfLiveBetsCard">
+          <div class="cf-table-head">
+            <span>🔴 JONLI STAVKALAR (<b id="cfTotalPlayers">4</b>)</span>
+            <span id="cfTotalPool">BANK: 0 UZS</span>
+          </div>
+          <div class="cf-table-body" id="cfLiveBetsTable">
+            <!-- Dynamic bets rows -->
+          </div>
+        </div>
+      </div>
+
+      <div class="arena-footer">
+        <div class="betting-box" id="cfBettingBox">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="cfMinus">-</button>
+              <input type="number" id="cfBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="cfPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="cfHalf">/2</button>
+            <button class="btn-b-mod" id="cfDouble">x2</button>
+            <button class="btn-b-mod" id="cfMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+          </div>
+          <button class="btn-play-game" id="cfActionBtn">STAVKA QILISH (ONLINE)</button>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-tasks">
       <div class="section-card tasks-card">
         <div class="tasks-cycle-banner">
@@ -652,6 +765,6 @@
 
   </div>
 
-  <script src="game.js?v=3.2"></script>
+  <script src="game.js?v=3.3"></script>
 </body>
 </html>

@@ -148,6 +148,19 @@ const appState = {
     angle: 0,
     history: [25.0, 2.0, 3.0, 0, 1.5],
     animId: null
+  },
+
+  cf: {
+    mode: "online",
+    choice: "heads",
+    bet: 5000,
+    flipping: false,
+    roundId: 1001,
+    phase: "betting",
+    myBetPlaced: false,
+    pollTimer: null,
+    rotationDeg: 0,
+    resultNotified: false
   }
 };
 
@@ -387,6 +400,18 @@ class AudioEngine {
       filter.connect(gain);
       gain.connect(this.ctx.destination);
       src.start();
+    } else if (type === "coin") {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1600, this.ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.35);
     }
   }
 }
@@ -895,7 +920,8 @@ function openGameView(viewId) {
     "view-mines": "mnBetInput",
     "view-thimbles": "thBetInput",
     "view-dice": "dcBetInput",
-    "view-wheel": "whBetInput"
+    "view-wheel": "whBetInput",
+    "view-coinflip": "cfBetInput"
   };
   const inputId = betInputMap[viewId];
   if (inputId) {
@@ -924,6 +950,7 @@ function openGameView(viewId) {
 function returnToLobby() {
   audio.play("click");
   triggerHaptic("light");
+  stopCoinFlipPolling();
   document.getElementById("app")?.classList.remove("in-game");
   document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
   document.getElementById("tab-lobby").classList.add("active");
@@ -943,6 +970,7 @@ document.getElementById("backFromMines")?.addEventListener("click", returnToLobb
 document.getElementById("backFromThimbles")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromDice")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromWheel")?.addEventListener("click", returnToLobby);
+document.getElementById("backFromCoinflip")?.addEventListener("click", returnToLobby);
 
 document.getElementById("bannerRefBtn").addEventListener("click", () => {
   document.querySelector('.tab-btn[data-tab="referral"]').click();
@@ -994,6 +1022,13 @@ document.querySelectorAll('.game-card[data-game="wheel"]').forEach(c => {
   c.addEventListener("click", () => {
     openGameView("view-wheel");
     initWheelGame();
+  });
+});
+
+document.querySelectorAll('.game-card[data-game="coinflip"]').forEach(c => {
+  c.addEventListener("click", () => {
+    openGameView("view-coinflip");
+    initCoinFlipGame();
   });
 });
 
@@ -3250,6 +3285,436 @@ document.querySelectorAll("#wheelBettingBox .b-chip").forEach(chip => {
 
 document.getElementById("whSpinBtn")?.addEventListener("click", spinWheel);
 document.getElementById("wheelCenterCap")?.addEventListener("click", spinWheel);
+
+/* ==========================================================================
+   🪙 COIN FLIP DUEL (ONLINE & OFFLINE) IMPLEMENTATION
+   ========================================================================== */
+
+function initCoinFlipGame() {
+  setCoinFlipMode(appState.cf.mode || "online");
+  renderCoinFlipHistory(["heads", "tails", "heads", "heads", "tails"]);
+  if (appState.cf.mode === "online") {
+    startCoinFlipPolling();
+  }
+}
+
+function stopCoinFlipPolling() {
+  if (appState.cf.pollTimer) {
+    clearInterval(appState.cf.pollTimer);
+    appState.cf.pollTimer = null;
+  }
+}
+
+function setCoinFlipMode(mode) {
+  appState.cf.mode = mode;
+  const tabOnline = document.getElementById("cfTabOnline");
+  const tabOffline = document.getElementById("cfTabOffline");
+  const onlineBar = document.getElementById("cfOnlineBar");
+  const liveBetsCard = document.getElementById("cfLiveBetsCard");
+  const actionBtn = document.getElementById("cfActionBtn");
+  const banner = document.getElementById("cfResultBanner");
+
+  if (mode === "online") {
+    tabOnline?.classList.add("active");
+    tabOffline?.classList.remove("active");
+    if (onlineBar) onlineBar.style.display = "flex";
+    if (liveBetsCard) liveBetsCard.style.display = "flex";
+    if (actionBtn) {
+      actionBtn.textContent = appState.cf.myBetPlaced ? "STAVKA QABUL QILINDI ⏳" : "STAVKA QILISH (ONLINE)";
+      actionBtn.disabled = appState.cf.myBetPlaced || appState.cf.phase !== "betting";
+    }
+    startCoinFlipPolling();
+  } else {
+    tabOffline?.classList.add("active");
+    tabOnline?.classList.remove("active");
+    if (onlineBar) onlineBar.style.display = "none";
+    if (liveBetsCard) liveBetsCard.style.display = "none";
+    if (actionBtn) {
+      actionBtn.textContent = "TASHLA 🪙 (OFFLINE)";
+      actionBtn.disabled = appState.cf.flipping;
+    }
+    stopCoinFlipPolling();
+  }
+  if (banner) {
+    banner.className = "cf-result-banner";
+    banner.textContent = mode === "online" ? "Tanlang va stavka qiling!" : "Tanga tomonini tanlang va 'Tashla' tugmasini bosing!";
+  }
+}
+
+function renderCoinFlipHistory(hist) {
+  const strip = document.getElementById("cfHistoryStrip");
+  if (!strip || !Array.isArray(hist)) return;
+  strip.innerHTML = "";
+  hist.slice(0, 6).forEach(res => {
+    const badge = document.createElement("span");
+    const isHeads = res === "heads";
+    badge.className = `cf-h-badge ${isHeads ? "heads" : "tails"}`;
+    badge.textContent = isHeads ? "🦅" : "👑";
+    badge.title = isHeads ? "Burgut" : "Gerb";
+    strip.appendChild(badge);
+  });
+}
+
+function animate3dCoin(targetResult, onFinish) {
+  const coin = document.getElementById("cf3dCoin");
+  if (!coin) {
+    if (onFinish) onFinish();
+    return;
+  }
+
+  audio.play("coin");
+  triggerHaptic("medium");
+
+  appState.cf.flipping = true;
+
+  const isHeads = targetResult === "heads";
+  const baseFlips = 1800;
+  const currentRot = appState.cf.rotationDeg || 0;
+  const nextTarget = (Math.ceil(currentRot / 360) * 360) + baseFlips + (isHeads ? 0 : 180);
+  appState.cf.rotationDeg = nextTarget;
+
+  coin.style.transform = `rotateY(${nextTarget}deg)`;
+
+  setTimeout(() => {
+    appState.cf.flipping = false;
+    triggerHaptic("heavy");
+    if (onFinish) onFinish();
+  }, 3000);
+}
+
+function startCoinFlipPolling() {
+  stopCoinFlipPolling();
+  fetchCoinFlipStatus();
+  appState.cf.pollTimer = setInterval(fetchCoinFlipStatus, 1000);
+}
+
+async function fetchCoinFlipStatus() {
+  if (appState.cf.mode !== "online") return;
+  try {
+    const res = await apiFetch(`/api/coinflip/status?user_id=${USER_ID}`);
+    if (res?.ok) {
+      updateCoinFlipOnlineUI(res);
+    }
+  } catch (e) {}
+}
+
+function updateCoinFlipOnlineUI(data) {
+  const roundTag = document.getElementById("cfRoundTag");
+  const timerText = document.getElementById("cfTimerText");
+  const phaseText = document.getElementById("cfPhaseText");
+  const actionBtn = document.getElementById("cfActionBtn");
+  const banner = document.getElementById("cfResultBanner");
+  const liveTable = document.getElementById("cfLiveBetsTable");
+  const totalPoolEl = document.getElementById("cfTotalPool");
+  const totalPlayersEl = document.getElementById("cfTotalPlayers");
+
+  if (roundTag) roundTag.textContent = `RAUND #${data.round_id}`;
+  if (timerText) timerText.textContent = `${data.time_left.toFixed(1)}s`;
+
+  appState.cf.roundId = data.round_id;
+  const prevPhase = appState.cf.phase;
+  appState.cf.phase = data.phase;
+
+  if (data.history) renderCoinFlipHistory(data.history);
+
+  const myBet = (data.bets || []).find(b => b.user_id === USER_ID && b.is_real);
+  if (myBet) {
+    appState.cf.myBetPlaced = true;
+  }
+
+  if (data.phase === "betting") {
+    if (prevPhase !== "betting") {
+      appState.cf.myBetPlaced = false;
+      appState.cf.resultNotified = false;
+      if (actionBtn && appState.cf.mode === "online") {
+        actionBtn.disabled = false;
+        actionBtn.textContent = "STAVKA QILISH (ONLINE)";
+      }
+      if (banner) {
+        banner.className = "cf-result-banner";
+        banner.textContent = "Stavkalar qabul qilinmoqda! Tanlang va bosing.";
+      }
+    }
+    if (phaseText) phaseText.textContent = "STAVKALAR QABUL QILINMOQDA";
+  } else if (data.phase === "flipping") {
+    if (prevPhase === "betting") {
+      if (data.result) {
+        animate3dCoin(data.result);
+      }
+    }
+    if (phaseText) phaseText.textContent = "TANGA TASHLAHQDA... 🪙";
+    if (actionBtn && appState.cf.mode === "online") {
+      actionBtn.disabled = true;
+      actionBtn.textContent = "TANGA UCHMOQDA... 🪙";
+    }
+  } else if (data.phase === "result") {
+    const isHeads = data.result === "heads";
+    const resName = isHeads ? "🦅 BURGUT" : "👑 GERB";
+    if (phaseText) phaseText.textContent = `NATIJA: ${resName}!`;
+
+    if (!appState.cf.resultNotified && myBet) {
+      appState.cf.resultNotified = true;
+      if (myBet.status === "won") {
+        audio.play("win");
+        triggerHaptic("heavy");
+        triggerScreenShake();
+        particleFx.explode(window.innerWidth / 2, window.innerHeight * 0.4);
+        showToast(`🎉 YUTUQ! +${formatMoney(myBet.win)} UZS (1.96x)`, true);
+        if (banner) {
+          banner.className = "cf-result-banner win";
+          banner.textContent = `🎉 G'ALABA! ${resName} tushdi! (+${formatMoney(myBet.win)} UZS)`;
+        }
+        initAppData();
+      } else if (myBet.status === "lost") {
+        audio.play("boom");
+        triggerHaptic("error");
+        showToast(`💥 Mag'lubiyat: -${formatMoney(myBet.bet)} UZS`, false);
+        if (banner) {
+          banner.className = "cf-result-banner lose";
+          banner.textContent = `💥 ${resName} tushdi! -${formatMoney(myBet.bet)} UZS`;
+        }
+      }
+    } else if (!myBet && banner && data.phase === "result") {
+      banner.className = "cf-result-banner";
+      banner.textContent = `Raund natijasi: ${resName}!`;
+    }
+  }
+
+  if (liveTable && Array.isArray(data.bets)) {
+    liveTable.innerHTML = "";
+    let totalPool = 0;
+    data.bets.forEach(b => {
+      totalPool += b.bet || 0;
+      const row = document.createElement("div");
+      let rowCls = "cf-bet-row";
+      if (b.user_id === USER_ID) rowCls += " me";
+      if (data.phase === "result") {
+        if (b.status === "won") rowCls += " winner";
+        else if (b.status === "lost") rowCls += " loser";
+      }
+      row.className = rowCls;
+
+      const isHeads = b.choice === "heads";
+      const choiceBadge = isHeads ? "🦅 Burgut" : "👑 Gerb";
+
+      let statusBadge = `<span class="cf-p-badge pending">⏳ Kutilmoqda</span>`;
+      if (data.phase === "result") {
+        if (b.status === "won") {
+          statusBadge = `<span class="cf-p-badge win">+${formatMoney(b.win)} UZS</span>`;
+        } else if (b.status === "lost") {
+          statusBadge = `<span class="cf-p-badge lose">-${formatMoney(b.bet)} UZS</span>`;
+        }
+      }
+
+      const initial = (b.name || "U")[0].toUpperCase();
+      const meTag = b.user_id === USER_ID ? " <b style='color:#ffd700;'>(SIZ)</b>" : "";
+
+      row.innerHTML = `
+        <div class="cf-p-info">
+          <div class="cf-p-avatar">${initial}</div>
+          <div class="cf-p-name">${b.name}${meTag}</div>
+        </div>
+        <div class="cf-p-choice">${choiceBadge}</div>
+        <div class="cf-p-amount">${formatMoney(b.bet)} UZS</div>
+        <div>${statusBadge}</div>
+      `;
+      liveTable.appendChild(row);
+    });
+
+    if (totalPoolEl) totalPoolEl.textContent = `BANK: ${formatMoney(totalPool)} UZS`;
+    if (totalPlayersEl) totalPlayersEl.textContent = data.bets.length;
+  }
+}
+
+async function placeCoinFlipOnlineBet() {
+  if (appState.cf.phase !== "betting") {
+    showToast("Stavka qabul qilish vaqti tugadi!", false);
+    return;
+  }
+  if (appState.cf.myBetPlaced) {
+    showToast("Siz allaqachon stavka qildingiz!", false);
+    return;
+  }
+
+  const betVal = getValidatedBet("cfBetInput");
+  if (!betVal) return;
+
+  appState.cf.bet = betVal;
+  const choice = appState.cf.choice || "heads";
+
+  audio.play("click");
+  triggerHaptic("medium");
+
+  const actionBtn = document.getElementById("cfActionBtn");
+  if (actionBtn) {
+    actionBtn.disabled = true;
+    actionBtn.textContent = "YUBORILMOQDA...";
+  }
+
+  const res = await apiFetch("/api/coinflip/bet", "POST", {
+    user_id: USER_ID,
+    choice: choice,
+    bet: betVal,
+    first_name: FIRST_NAME,
+    username: USERNAME
+  });
+
+  if (res?.ok) {
+    appState.cf.myBetPlaced = true;
+    updateBalanceUI(res.balance);
+    showToast(`✅ Stavka qabul qilindi: ${choice === "heads" ? "🦅 Burgut" : "👑 Gerb"} (${formatMoney(betVal)} UZS)`, true);
+    if (actionBtn) {
+      actionBtn.textContent = "STAVKA QABUL QILINDI ⏳";
+      actionBtn.disabled = true;
+    }
+    fetchCoinFlipStatus();
+  } else {
+    showToast(res?.error || "Stavka qabul qilinmadi!", false);
+    if (actionBtn) {
+      actionBtn.disabled = false;
+      actionBtn.textContent = "STAVKA QILISH (ONLINE)";
+    }
+  }
+}
+
+async function playCoinFlipOffline() {
+  if (appState.cf.flipping) return;
+
+  const betVal = getValidatedBet("cfBetInput");
+  if (!betVal) return;
+
+  appState.cf.bet = betVal;
+  appState.cf.flipping = true;
+  updateBalanceUI(appState.balance - betVal);
+
+  const actionBtn = document.getElementById("cfActionBtn");
+  if (actionBtn) {
+    actionBtn.disabled = true;
+    actionBtn.textContent = "UCHMOQDA... 🪙";
+  }
+
+  const banner = document.getElementById("cfResultBanner");
+  if (banner) {
+    banner.className = "cf-result-banner";
+    banner.textContent = "Tanga havoga ko'tarildi...";
+  }
+
+  const choice = appState.cf.choice || "heads";
+  let result = "heads";
+  if (appState.evilMode) {
+    result = Math.random() < 0.65 ? (choice === "heads" ? "tails" : "heads") : choice;
+  } else {
+    result = Math.random() < 0.5 ? "heads" : "tails";
+  }
+
+  animate3dCoin(result, async () => {
+    const isWin = result === choice;
+    const resName = result === "heads" ? "🦅 BURGUT" : "👑 GERB";
+
+    if (isWin) {
+      const winAmt = Math.round(betVal * 1.96);
+      updateBalanceUI(appState.balance + winAmt);
+      audio.play("win");
+      triggerHaptic("heavy");
+      triggerScreenShake();
+      particleFx.explode(window.innerWidth / 2, window.innerHeight * 0.4);
+
+      if (banner) {
+        banner.className = "cf-result-banner win";
+        banner.textContent = `🎉 YUTUQ! ${resName} tushdi! (+${formatMoney(winAmt)} UZS)`;
+      }
+      showToast(`🎉 TABRIKLAYMIZ! +${formatMoney(winAmt)} UZS (1.96x)`, true);
+
+      const res = await apiFetch("/api/game-result", "POST", {
+        user_id: USER_ID,
+        game_name: "coinflip_offline",
+        bet: betVal,
+        win: winAmt,
+        multiplier: 1.96
+      });
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    } else {
+      audio.play("boom");
+      triggerHaptic("error");
+      triggerScreenShake();
+
+      if (banner) {
+        banner.className = "cf-result-banner lose";
+        banner.textContent = `💥 ${resName} tushdi! -${formatMoney(betVal)} UZS`;
+      }
+      showToast(`💥 Omadsiz! -${formatMoney(betVal)} UZS`, false);
+
+      const res = await apiFetch("/api/game-result", "POST", {
+        user_id: USER_ID,
+        game_name: "coinflip_offline",
+        bet: betVal,
+        win: 0,
+        multiplier: 0
+      });
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }
+
+    setTimeout(() => {
+      appState.cf.flipping = false;
+      if (actionBtn && appState.cf.mode === "offline") {
+        actionBtn.disabled = false;
+        actionBtn.textContent = "TASHLA 🪙 (OFFLINE)";
+      }
+    }, 1000);
+  });
+}
+
+// Coin Flip Mode Switch
+document.getElementById("cfTabOnline")?.addEventListener("click", () => setCoinFlipMode("online"));
+document.getElementById("cfTabOffline")?.addEventListener("click", () => setCoinFlipMode("offline"));
+
+// Choice selection (Heads / Tails)
+document.getElementById("cfPickHeads")?.addEventListener("click", () => {
+  if (appState.cf.myBetPlaced && appState.cf.mode === "online") return;
+  audio.play("click");
+  triggerHaptic("light");
+  appState.cf.choice = "heads";
+  document.getElementById("cfPickHeads")?.classList.add("active");
+  document.getElementById("cfPickTails")?.classList.remove("active");
+});
+
+document.getElementById("cfPickTails")?.addEventListener("click", () => {
+  if (appState.cf.myBetPlaced && appState.cf.mode === "online") return;
+  audio.play("click");
+  triggerHaptic("light");
+  appState.cf.choice = "tails";
+  document.getElementById("cfPickTails")?.classList.add("active");
+  document.getElementById("cfPickHeads")?.classList.remove("active");
+});
+
+// Bet modifiers
+document.getElementById("cfMinus")?.addEventListener("click", () => adjustBetInput("cfBetInput", "minus"));
+document.getElementById("cfPlus")?.addEventListener("click", () => adjustBetInput("cfBetInput", "plus"));
+document.getElementById("cfHalf")?.addEventListener("click", () => adjustBetInput("cfBetInput", "half"));
+document.getElementById("cfDouble")?.addEventListener("click", () => adjustBetInput("cfBetInput", "double"));
+document.getElementById("cfMax")?.addEventListener("click", () => adjustBetInput("cfBetInput", "max"));
+
+document.querySelectorAll("#cfBettingBox .b-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const val = parseInt(chip.getAttribute("data-v"), 10);
+    setBetChip("cfBetInput", val);
+  });
+});
+
+// Action button
+document.getElementById("cfActionBtn")?.addEventListener("click", () => {
+  if (appState.cf.mode === "online") {
+    placeCoinFlipOnlineBet();
+  } else {
+    playCoinFlipOffline();
+  }
+});
 
 initAppData();
 renderKamikazeBoard();

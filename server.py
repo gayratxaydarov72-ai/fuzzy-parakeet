@@ -8,6 +8,7 @@ import time
 import threading
 from collections import defaultdict
 import urllib.parse
+import random
 from datetime import datetime, timedelta, time as dt_time
 import database
 
@@ -95,6 +96,159 @@ class SecurityLimiter:
             return True
 
 security_limiter = SecurityLimiter()
+
+# ============================================================================
+# 🪙 REAL-TIME SYNCHRONIZED MULTIPLAYER COIN FLIP LIVE ROOM
+# ============================================================================
+class CoinFlipLiveRoom:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.round_id = 1001
+        self.phase = "betting"  # "betting" (10s) -> "flipping" (3s) -> "result" (4s)
+        self.total_phase_duration = 10.0
+        self.phase_end_time = time.time() + 10.0
+        self.result = None  # "heads" or "tails"
+        self.history = ["heads", "tails", "heads", "heads", "tails"]
+        self.bets = {}  # uid -> dict
+        self.simulated_users = [
+            {"user_id": 8801, "name": "Jasur Crypto", "username": "jasur_crypto"},
+            {"user_id": 8802, "name": "Azamat UZ", "username": "azamat_uz"},
+            {"user_id": 8803, "name": "Farrux Bek", "username": "farrux_77"},
+            {"user_id": 8804, "name": "Bekzod", "username": "bekzod_01"},
+            {"user_id": 8805, "name": "Malika", "username": "malika_star"},
+            {"user_id": 8806, "name": "Islom Trader", "username": "islom_trader"},
+            {"user_id": 8807, "name": "Otabek", "username": "otabek_uzb"},
+            {"user_id": 8808, "name": "Sardor WIN", "username": "sardor_winner"}
+        ]
+        self.populate_simulated_bets()
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def populate_simulated_bets(self):
+        count = random.randint(3, 5)
+        picked = random.sample(self.simulated_users, count)
+        amounts = [2000, 5000, 10000, 25000, 50000]
+        for u in picked:
+            choice = "heads" if random.random() < 0.5 else "tails"
+            amt = random.choice(amounts)
+            self.bets[u["user_id"]] = {
+                "user_id": u["user_id"],
+                "name": u["name"],
+                "username": u["username"],
+                "choice": choice,
+                "bet": amt,
+                "win": 0,
+                "status": "pending",
+                "is_real": False
+            }
+
+    def _loop(self):
+        while self.running:
+            time.sleep(0.25)
+            now = time.time()
+            with self.lock:
+                if self.phase == "betting":
+                    if now >= self.phase_end_time:
+                        self.phase = "flipping"
+                        self.total_phase_duration = 3.2
+                        self.phase_end_time = now + 3.2
+                        
+                        evil = database.get_evil_mode()
+                        real_user_bets = [b for b in self.bets.values() if b.get("is_real")]
+                        if evil and real_user_bets:
+                            h_bets = sum(b["bet"] for b in real_user_bets if b["choice"] == "heads")
+                            t_bets = sum(b["bet"] for b in real_user_bets if b["choice"] == "tails")
+                            if h_bets > t_bets:
+                                self.result = "tails"
+                            elif t_bets > h_bets:
+                                self.result = "heads"
+                            else:
+                                self.result = "heads" if random.random() < 0.5 else "tails"
+                        else:
+                            self.result = "heads" if random.random() < 0.5 else "tails"
+
+                elif self.phase == "flipping":
+                    if now >= self.phase_end_time:
+                        self.phase = "result"
+                        self.total_phase_duration = 4.0
+                        self.phase_end_time = now + 4.0
+                        self.history.insert(0, self.result)
+                        self.history = self.history[:10]
+
+                        for uid, b in self.bets.items():
+                            if b["choice"] == self.result:
+                                b["status"] = "won"
+                                b["win"] = int(b["bet"] * 1.96)
+                                if b.get("is_real"):
+                                    try:
+                                        database.update_user_balance(uid, b["win"])
+                                        database.record_game(uid, "coinflip_online", b["bet"], b["win"], 1.96)
+                                    except Exception:
+                                        pass
+                            else:
+                                b["status"] = "lost"
+                                b["win"] = 0
+                                if b.get("is_real"):
+                                    try:
+                                        database.record_game(uid, "coinflip_online", b["bet"], 0, 0.0)
+                                    except Exception:
+                                        pass
+
+                elif self.phase == "result":
+                    if now >= self.phase_end_time:
+                        self.round_id += 1
+                        self.phase = "betting"
+                        self.total_phase_duration = 10.0
+                        self.phase_end_time = now + 10.0
+                        self.result = None
+                        self.bets.clear()
+                        self.populate_simulated_bets()
+
+    def place_bet(self, user_id: int, name: str, username: str, choice: str, bet: int):
+        with self.lock:
+            if self.phase != "betting":
+                return False, "Stavka qabul qilish vaqti tugadi!"
+            if user_id in self.bets and self.bets[user_id].get("is_real"):
+                return False, "Siz bu raundda allaqachon stavka qildingiz!"
+            user = database.get_or_create_user(user_id)
+            if user["balance"] < bet:
+                return False, "Hisobingizda mablag' yetarli emas!"
+            
+            new_bal = database.update_user_balance(user_id, -bet)
+            self.bets[user_id] = {
+                "user_id": user_id,
+                "name": name or "O'yinchi",
+                "username": username or "",
+                "choice": choice,
+                "bet": bet,
+                "win": 0,
+                "status": "pending",
+                "is_real": True
+            }
+            return True, new_bal
+
+    def get_status(self, current_user_id: int = 0):
+        with self.lock:
+            now = time.time()
+            time_left = max(0.0, round(self.phase_end_time - now, 1))
+            bets_list = list(self.bets.values())
+            bets_list.sort(key=lambda b: (
+                0 if b["user_id"] == current_user_id else (1 if b.get("is_real") else 2),
+                -b["bet"]
+            ))
+            return {
+                "round_id": self.round_id,
+                "phase": self.phase,
+                "time_left": time_left,
+                "total_time": self.total_phase_duration,
+                "result": self.result,
+                "history": self.history,
+                "bets": bets_list,
+                "user_bet": self.bets.get(current_user_id)
+            }
+
+coinflip_room = CoinFlipLiveRoom()
 
 # ============================================================================
 # ⚡ IN-MEMORY ULTRA-FAST STATIC ASSET CACHE (0.05ms serving directly from RAM)
@@ -265,7 +419,10 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
 
             rows = database.exec_query("SELECT * FROM game_history WHERE user_id = ? ORDER BY id DESC LIMIT 20", (uid,), fetch_all=True)
-            return self.send_json({"ok": True, "history": rows})
+        elif path == "/api/coinflip/status":
+            uid = safe_int(query.get("user_id", [999999])[0], 999999)
+            res = coinflip_room.get_status(uid)
+            return self.send_json({"ok": True, **res})
 
         # Instant serving from RAM memory (0.05ms)
         if self.serve_cached(path):
@@ -361,7 +518,18 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": False, "error": "Hisobni to'ldirish uchun 10 soniya kuting!"}, status=429)
             amt = max(1000, min(10000, safe_int(data.get("amount"), 10000)))
             new_bal = database.update_user_balance(uid, amt)
-            return self.send_json({"ok": True, "balance": new_bal})
+        elif path == "/api/coinflip/bet":
+            choice = str(data.get("choice") or "heads").lower()
+            if choice not in ("heads", "tails"):
+                return self.send_json({"ok": False, "error": "Noto'g'ri tanlov! (heads yoki tails)"}, status=400)
+            bet = max(1000, min(10_000_000, safe_int(data.get("bet"), 1000)))
+            name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
+            uname = str(data.get("username") or "")[:40]
+            ok, res_bal_or_err = coinflip_room.place_bet(uid, name, uname, choice, bet)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_bal_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
 
         self.send_json({"error": "Not Found"}, status=404)
 

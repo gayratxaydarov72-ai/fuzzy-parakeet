@@ -271,6 +271,7 @@ def init_db():
             ('MINES', 3000, 1000),
             ('DICE', 2500, 1000),
             ('WHEEL', 3000, 1000),
+            ('COIN', 3000, 1000),
             ('APPLE', 2000, 1000),
             ('BONUS', 1500, 5000)
         ]
@@ -474,6 +475,7 @@ def ensure_daily_tasks(user_id: int):
         ("play_thimbles", "🪚 Thimbles: 2 marta to'pni topish" if is_even else "🪚 Thimbles: 3 marta to'g'ri stakanni tanlash", 1500 if is_even else 2000, 2 if is_even else 3),
         ("play_dice", "🎲 Under/Over 7: 2 marta to'g'ri topish" if is_even else "🎲 Under/Over 7: 3 marta toshlar yig'indisini topish", 1500 if is_even else 2000, 2 if is_even else 3),
         ("play_wheel", "🎡 Lucky Wheel: 2 marta g'ildirakni aylantirish" if is_even else "🎡 Lucky Wheel: 3 marta omad g'ildiragida yutish", 1500 if is_even else 2000, 2 if is_even else 3),
+        ("play_coinflip", "🪙 Coin Flip: 2 marta tanga tashlashda yutish" if is_even else "🪙 Coin Flip: 3 marta online tanga jangida qatnashish", 1500 if is_even else 2000, 2 if is_even else 3),
         ("reach_multiplier" if is_even else "win_games", "⚡ Har qanday o'yinda 2.50x dan yuqori yutish" if is_even else "🏆 Istalgan o'yinlarda 3 ta g'alabaga erishish", 2500 if is_even else 2000, 1 if is_even else 3),
         ("high_stake" if is_even else "invite_friend", "💰 Kamida 10 000 UZS stavka qilish" if is_even else "👥 1 ta yangi do'stni taklif qilish (+2000 UZS)", 2000 if is_even else 2500, 1)
     ]
@@ -615,6 +617,8 @@ def record_game(user_id: int, game_name: str, bet: int, win: int, multiplier: fl
         update_task_progress(user_id, "play_dice", 1)
     if ("wheel" in g_name or "omad" in g_name) and win > 0:
         update_task_progress(user_id, "play_wheel", 1)
+    if ("coinflip" in g_name or "tanga" in g_name) and win > 0:
+        update_task_progress(user_id, "play_coinflip", 1)
 
     return provably_hash
 
