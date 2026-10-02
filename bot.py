@@ -3,13 +3,16 @@ import sys
 import asyncio
 import logging
 import threading
-from aiogram import Bot, Dispatcher, types, F
+from collections import defaultdict
+import time
+from aiogram import Bot, Dispatcher, types, F, BaseMiddleware
 from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     WebAppInfo,
-    MenuButtonWebApp
+    MenuButtonWebApp,
+    TelegramObject
 )
 import database
 import server
@@ -39,41 +42,130 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 def is_admin(user_id: int) -> bool:
     return ADMIN_ID != 0 and user_id == ADMIN_ID
 
+LIVE_URL_CACHE = None
+
 def get_live_url() -> str:
+    global LIVE_URL_CACHE
+    if LIVE_URL_CACHE:
+        return LIVE_URL_CACHE
+
     render_url = os.getenv("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
     if render_url:
         if not render_url.startswith("http://") and not render_url.startswith("https://"):
             render_url = f"https://{render_url}"
-        database.set_setting("webapp_url", render_url)
+        LIVE_URL_CACHE = render_url
+        if database.get_setting("webapp_url") != render_url:
+            database.set_setting("webapp_url", render_url)
         return render_url
 
     render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip().rstrip("/")
     if render_host:
         u = f"https://{render_host}"
-        database.set_setting("webapp_url", u)
+        LIVE_URL_CACHE = u
+        if database.get_setting("webapp_url") != u:
+            database.set_setting("webapp_url", u)
         return u
 
     render_svc = os.getenv("RENDER_SERVICE_NAME", "").strip()
     if render_svc:
         u = f"https://{render_svc}.onrender.com"
-        database.set_setting("webapp_url", u)
+        LIVE_URL_CACHE = u
+        if database.get_setting("webapp_url") != u:
+            database.set_setting("webapp_url", u)
         return u
 
     db_url = database.get_setting("webapp_url", "").strip().rstrip("/")
     if db_url and not db_url.startswith("http://localhost") and not db_url.startswith("http://127.0.0.1"):
+        LIVE_URL_CACHE = db_url
         return db_url
 
     env_url = os.getenv("WEBAPP_URL", "").strip().rstrip("/")
     if env_url and not env_url.startswith("http://localhost") and not env_url.startswith("http://127.0.0.1"):
+        LIVE_URL_CACHE = env_url
         return env_url
 
     if db_url:
+        LIVE_URL_CACHE = db_url
         return db_url
     if env_url:
+        LIVE_URL_CACHE = env_url
         return env_url
     return f"http://localhost:{PORT}"
 
+# ============================================================================
+# 🛡️ BOT ANTI-FLOOD, ANTI-DOS & RATE LIMITING MIDDLEWARE
+# ============================================================================
+class AntiFloodMiddleware(BaseMiddleware):
+    def __init__(self, limit_seconds: float = 0.5, max_burst: int = 5):
+        super().__init__()
+        self.limit_seconds = limit_seconds
+        self.max_burst = max_burst
+        self.user_timestamps = defaultdict(list)
+        self.temp_blocked = {}
+
+    async def __call__(self, handler, event: TelegramObject, data: dict):
+        user = getattr(event, "from_user", None)
+        if not user:
+            return await handler(event, data)
+
+        user_id = user.id
+        now = time.time()
+
+        # Admin is immune to rate limits
+        if is_admin(user_id):
+            return await handler(event, data)
+
+        # Check temporary flood block (DoS protection)
+        if user_id in self.temp_blocked:
+            unblock_time = self.temp_blocked[user_id]
+            if now < unblock_time:
+                wait_sec = max(1, int(unblock_time - now))
+                if isinstance(event, types.CallbackQuery):
+                    try:
+                        await event.answer(f"🛡️ Spam himoyasi! {wait_sec} soniya kuting.", show_alert=True)
+                    except Exception:
+                        pass
+                return
+            else:
+                del self.temp_blocked[user_id]
+
+        history = [t for t in self.user_timestamps[user_id] if now - t < 5.0]
+        if len(history) >= self.max_burst:
+            self.temp_blocked[user_id] = now + 25.0
+            self.user_timestamps[user_id] = []
+            if isinstance(event, types.Message):
+                try:
+                    await event.answer(
+                        "🛡️ <b>Xavfsizlik tizimi:</b> Juda ko'p tezkor so'rovlar aniqlandi!\n"
+                        "Spam va DoS hujumlaridan himoyalanish maqsadida 25 soniyaga vaqtincha cheklov qo'yildi.",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+            elif isinstance(event, types.CallbackQuery):
+                try:
+                    await event.answer("🛡️ Juda ko'p so'rovlar! 25 soniya kuting.", show_alert=True)
+                except Exception:
+                    pass
+            return
+
+        # Micro rate limit between clicks (0.5s)
+        if history and (now - history[-1] < self.limit_seconds):
+            self.user_timestamps[user_id].append(now)
+            if isinstance(event, types.CallbackQuery):
+                try:
+                    await event.answer("Iltimos, biroz kuting...", show_alert=False)
+                except Exception:
+                    pass
+            return
+
+        self.user_timestamps[user_id] = history + [now]
+        return await handler(event, data)
+
 dp = Dispatcher()
+anti_flood = AntiFloodMiddleware()
+dp.message.middleware(anti_flood)
+dp.callback_query.middleware(anti_flood)
 
 async def check_ban(user_id: int, bot: Bot, chat_id: int) -> bool:
     banned, reason = database.is_user_banned(user_id)
@@ -366,9 +458,11 @@ async def seturl_cmd(message: types.Message, command: CommandObject):
             parse_mode="HTML"
         )
         return
+    global LIVE_URL_CACHE
     new_url = command.args.strip().rstrip("/")
     if not new_url.startswith("http://") and not new_url.startswith("https://"):
         new_url = f"https://{new_url}"
+    LIVE_URL_CACHE = new_url
     database.set_setting("webapp_url", new_url)
     await message.answer(
         f"✅ <b>Jonli WebApp havolasi muvaffaqiyatli saqlandi!</b>\n\n"

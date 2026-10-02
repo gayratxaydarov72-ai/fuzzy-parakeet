@@ -22,11 +22,11 @@ window.addEventListener("resize", () => {
 });
 
 const urlParams = new URLSearchParams(window.location.search);
-let initialUid = urlParams.get("uid");
-if (!initialUid || initialUid === "undefined" || initialUid === "null" || isNaN(parseInt(initialUid, 10))) {
-  initialUid = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-}
+let initialUid = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
 if (!initialUid || isNaN(parseInt(initialUid, 10))) {
+  initialUid = urlParams.get("uid");
+}
+if (!initialUid || initialUid === "undefined" || initialUid === "null" || isNaN(parseInt(initialUid, 10))) {
   initialUid = localStorage.getItem("nv_user_id");
 }
 if (!initialUid || isNaN(parseInt(initialUid, 10))) {
@@ -34,8 +34,8 @@ if (!initialUid || isNaN(parseInt(initialUid, 10))) {
 }
 localStorage.setItem("nv_user_id", String(initialUid));
 const USER_ID = parseInt(initialUid, 10);
-const FIRST_NAME = urlParams.get("name") || tg?.initDataUnsafe?.user?.first_name || "O'yinchi";
-const USERNAME = urlParams.get("user") || tg?.initDataUnsafe?.user?.username || "";
+const FIRST_NAME = tg?.initDataUnsafe?.user?.first_name || urlParams.get("name") || "O'yinchi";
+const USERNAME = tg?.initDataUnsafe?.user?.username || urlParams.get("user") || "";
 
 const KM_MODELS = {
   idle: `<div class="km-idle-box"><svg viewBox="0 0 32 32" class="km-radar-svg"><circle cx="16" cy="16" r="14" fill="none" stroke="rgba(33, 133, 235, 0.35)" stroke-width="1.2"/><circle cx="16" cy="16" r="8" fill="none" stroke="rgba(33, 133, 235, 0.2)" stroke-width="1"/><line x1="16" y1="2" x2="16" y2="30" stroke="rgba(33, 133, 235, 0.25)" stroke-width="1"/><line x1="2" y1="16" x2="30" y2="16" stroke="rgba(33, 133, 235, 0.25)" stroke-width="1"/><path d="M16 6 L20 15 L26 17 L21 19 L20 26 L16 23 L12 26 L11 19 L6 17 L12 15 Z" fill="rgba(80, 175, 255, 0.85)"/><circle cx="16" cy="16" r="2.2" fill="#2ed573"/></svg></div>`,

@@ -282,20 +282,31 @@ def init_db():
     release_connection(conn)
 
 USER_CACHE = {}
+SETTING_CACHE = {}
+TASKS_ENSURED_CACHE = set()
+ADMIN_STATS_CACHE = {"data": None, "ts": 0}
 
 def invalidate_user_cache(user_id: int = None):
     if user_id is None:
         USER_CACHE.clear()
     else:
         USER_CACHE.pop(user_id, None)
+    ADMIN_STATS_CACHE["ts"] = 0
 
 def get_setting(key: str, default: str = "") -> str:
+    now = time.time()
+    cached = SETTING_CACHE.get(key)
+    if cached and (now - cached["ts"] < 60.0):
+        return cached["val"]
     row = exec_query("SELECT value FROM system_settings WHERE key = ?", (key,), fetch_one=True)
+    val = default
     if row and row.get("value"):
-        return str(row["value"])
-    return default
+        val = str(row["value"])
+    SETTING_CACHE[key] = {"val": val, "ts": now}
+    return val
 
 def set_setting(key: str, value: str):
+    SETTING_CACHE[key] = {"val": str(value), "ts": time.time()}
     if USE_POSTGRES:
         exec_query("INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (key, str(value)), commit=True)
     else:
@@ -304,7 +315,7 @@ def set_setting(key: str, value: str):
 def get_user(user_id: int):
     now = time.time()
     cached = USER_CACHE.get(user_id)
-    if cached and (now - cached["ts"] < 2.0):
+    if cached and (now - cached["ts"] < 15.0):
         return cached["data"]
 
     u = exec_query("SELECT * FROM users WHERE user_id = ?", (user_id,), fetch_one=True)
@@ -328,24 +339,40 @@ def unban_user(user_id: int):
     exec_query("UPDATE users SET is_banned = 0, ban_reason = '' WHERE user_id = ?", (user_id,), commit=True)
     return True
 
+def _get_admin_stats():
+    now = time.time()
+    if ADMIN_STATS_CACHE["data"] and (now - ADMIN_STATS_CACHE["ts"] < 10.0):
+        return ADMIN_STATS_CACHE["data"]
+    
+    total_users_row = exec_query("SELECT COUNT(*) as cnt FROM users", fetch_one=True)
+    banned_row = exec_query("SELECT COUNT(*) as cnt FROM users WHERE is_banned = 1", fetch_one=True)
+    balance_row = exec_query("SELECT SUM(balance) as total FROM users", fetch_one=True)
+    games_row = exec_query("SELECT COUNT(*) as cnt FROM game_history", fetch_one=True)
+
+    data = {
+        "users": total_users_row["cnt"] if total_users_row else 0,
+        "banned": banned_row["cnt"] if banned_row else 0,
+        "balance": balance_row["total"] if (balance_row and balance_row["total"] is not None) else 0,
+        "games": games_row["cnt"] if games_row else 0
+    }
+    ADMIN_STATS_CACHE["data"] = data
+    ADMIN_STATS_CACHE["ts"] = now
+    return data
+
 def get_all_users_count() -> int:
-    row = exec_query("SELECT COUNT(*) as cnt FROM users", fetch_one=True)
-    return row["cnt"] if row else 0
+    return _get_admin_stats()["users"]
 
 def get_banned_users_count() -> int:
-    row = exec_query("SELECT COUNT(*) as cnt FROM users WHERE is_banned = 1", fetch_one=True)
-    return row["cnt"] if row else 0
+    return _get_admin_stats()["banned"]
 
 def get_banned_users(limit: int = 20):
     return exec_query("SELECT user_id, first_name, username, ban_reason FROM users WHERE is_banned = 1 LIMIT ?", (limit,), fetch_all=True)
 
 def get_total_balance() -> int:
-    row = exec_query("SELECT SUM(balance) as total FROM users", fetch_one=True)
-    return row["total"] if row and row["total"] is not None else 0
+    return _get_admin_stats()["balance"]
 
 def get_total_games() -> int:
-    row = exec_query("SELECT COUNT(*) as cnt FROM game_history", fetch_one=True)
-    return row["cnt"] if row else 0
+    return _get_admin_stats()["games"]
 
 def get_all_user_ids():
     rows = exec_query("SELECT user_id FROM users", fetch_all=True)
@@ -422,10 +449,15 @@ def get_or_create_user(user_id: int, first_name: str = "", username: str = "", r
 
 def ensure_daily_tasks(user_id: int):
     today = date.today().isoformat()
+    cache_key = (user_id, today)
+    if cache_key in TASKS_ENSURED_CACHE:
+        return
+
     day_num = date.today().toordinal()
 
     existing = exec_query("SELECT COUNT(*) as cnt FROM daily_tasks WHERE user_id = ? AND task_date = ?", (user_id, today), fetch_one=True)
     if existing and existing.get("cnt", 0) >= 10:
+        TASKS_ENSURED_CACHE.add(cache_key)
         return
 
     is_even = (day_num % 2 == 0)
@@ -460,6 +492,7 @@ def ensure_daily_tasks(user_id: int):
             """, (user_id, key, title, reward, target, today), commit=True)
 
     exec_query("UPDATE daily_tasks SET current_val = 1, completed = 1 WHERE user_id = ? AND task_key = 'login_daily' AND task_date = ?", (user_id, today), commit=True)
+    TASKS_ENSURED_CACHE.add(cache_key)
 
 def update_task_progress(user_id: int, task_key: str, increment: int = 1):
     today = date.today().isoformat()
