@@ -1,284 +1,436 @@
-import sqlite3
-import hashlib
 import os
+import sys
 import time
+import hashlib
+import sqlite3
 from datetime import date
+
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+USE_POSTGRES = bool(DATABASE_URL and (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")))
+
+if USE_POSTGRES:
+    try:
+        import psycopg2
+        import psycopg2.extras
+    except ImportError:
+        USE_POSTGRES = False
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "1xbet_games.db")
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    return conn
+    if USE_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        conn.autocommit = True
+        return conn
+    else:
+        conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        return conn
+
+def exec_query(sql, params=(), fetch_one=False, fetch_all=False, commit=False):
+    conn = get_connection()
+    cur = conn.cursor()
+    if USE_POSTGRES:
+        sql = sql.replace("?", "%s")
+    cur.execute(sql, params)
+    if commit and not USE_POSTGRES:
+        conn.commit()
+
+    res = None
+    if fetch_one:
+        row = cur.fetchone()
+        res = dict(row) if row else None
+    elif fetch_all:
+        rows = cur.fetchall()
+        res = [dict(r) for r in rows] if rows else []
+
+    conn.close()
+    return res
 
 def init_db():
     conn = get_connection()
     cur = conn.cursor()
-    
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY,
-        first_name TEXT,
-        username TEXT,
-        balance INTEGER DEFAULT 50000,
-        referrer_id INTEGER,
-        invited_count INTEGER DEFAULT 0,
-        total_earned_ref INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS promocodes (
-        code TEXT PRIMARY KEY,
-        amount INTEGER NOT NULL,
-        max_uses INTEGER DEFAULT 100,
-        used_count INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
+    if USE_POSTGRES:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id BIGINT PRIMARY KEY,
+            first_name TEXT,
+            username TEXT,
+            balance BIGINT DEFAULT 10000,
+            referrer_id BIGINT,
+            invited_count INTEGER DEFAULT 0,
+            total_earned_ref BIGINT DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            ban_reason TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS promocodes (
+            code TEXT PRIMARY KEY,
+            amount INTEGER NOT NULL,
+            max_uses INTEGER DEFAULT 100,
+            used_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS promo_uses (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            code TEXT,
+            used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, code)
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_tasks (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            task_key TEXT,
+            title TEXT,
+            reward INTEGER,
+            current_val INTEGER DEFAULT 0,
+            target_val INTEGER DEFAULT 1,
+            completed INTEGER DEFAULT 0,
+            claimed INTEGER DEFAULT 0,
+            task_date TEXT,
+            UNIQUE(user_id, task_key, task_date)
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS game_history (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            game_name TEXT,
+            bet INTEGER,
+            win INTEGER,
+            multiplier REAL,
+            provably_hash TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS promo_uses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        code TEXT,
-        used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id, code)
-    );
-    """)
+        promos = [
+            ('NVINDIA', 5000, 5000),
+            ('NVIDIA', 4000, 5000),
+            ('1XBET', 3000, 1000),
+            ('KAMIKAZE', 3000, 1000),
+            ('MINES', 3000, 1000),
+            ('DICE', 2500, 1000),
+            ('APPLE', 2000, 1000),
+            ('BONUS', 1500, 5000)
+        ]
+        for c, a, m in promos:
+            cur.execute("INSERT INTO promocodes (code, amount, max_uses) VALUES (%s, %s, %s) ON CONFLICT (code) DO NOTHING", (c, a, m))
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS daily_tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        task_key TEXT,
-        title TEXT,
-        reward INTEGER,
-        current_val INTEGER DEFAULT 0,
-        target_val INTEGER DEFAULT 1,
-        completed INTEGER DEFAULT 0,
-        claimed INTEGER DEFAULT 0,
-        task_date TEXT,
-        UNIQUE(user_id, task_key, task_date)
-    );
-    """)
+    else:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            first_name TEXT,
+            username TEXT,
+            balance INTEGER DEFAULT 10000,
+            referrer_id INTEGER,
+            invited_count INTEGER DEFAULT 0,
+            total_earned_ref INTEGER DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            ban_reason TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0;")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN ban_reason TEXT DEFAULT '';")
+        except Exception:
+            pass
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS game_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        game_name TEXT,
-        bet INTEGER,
-        win INTEGER,
-        multiplier REAL,
-        provably_hash TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS promocodes (
+            code TEXT PRIMARY KEY,
+            amount INTEGER NOT NULL,
+            max_uses INTEGER DEFAULT 100,
+            used_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS promo_uses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            code TEXT,
+            used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, code)
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            task_key TEXT,
+            title TEXT,
+            reward INTEGER,
+            current_val INTEGER DEFAULT 0,
+            target_val INTEGER DEFAULT 1,
+            completed INTEGER DEFAULT 0,
+            claimed INTEGER DEFAULT 0,
+            task_date TEXT,
+            UNIQUE(user_id, task_key, task_date)
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS game_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            game_name TEXT,
+            bet INTEGER,
+            win INTEGER,
+            multiplier REAL,
+            provably_hash TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS system_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    );
-    """)
+        promos = [
+            ('NVINDIA', 5000, 5000),
+            ('NVIDIA', 4000, 5000),
+            ('1XBET', 3000, 1000),
+            ('KAMIKAZE', 3000, 1000),
+            ('MINES', 3000, 1000),
+            ('DICE', 2500, 1000),
+            ('APPLE', 2000, 1000),
+            ('BONUS', 1500, 5000)
+        ]
+        for c, a, m in promos:
+            cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES (?, ?, ?)", (c, a, m))
 
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('NVINDIA', 25000, 5000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('NVIDIA', 20000, 5000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('1XBET', 15000, 1000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('KAMIKAZE', 20000, 1000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('APPLE', 10000, 1000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('MINES', 20000, 1000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('DICE', 15000, 1000);")
-    cur.execute("INSERT OR IGNORE INTO promocodes (code, amount, max_uses) VALUES ('BONUS5000', 5000, 5000);")
+        conn.commit()
 
-    conn.commit()
     conn.close()
 
 def get_setting(key: str, default: str = "") -> str:
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT value FROM system_settings WHERE key = ?", (key,))
-    row = cur.fetchone()
-    conn.close()
-    if row and row["value"]:
+    row = exec_query("SELECT value FROM system_settings WHERE key = ?", (key,), fetch_one=True)
+    if row and row.get("value"):
         return str(row["value"])
     return default
 
 def set_setting(key: str, value: str):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, str(value)))
-    conn.commit()
-    conn.close()
+    if USE_POSTGRES:
+        exec_query("INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (key, str(value)), commit=True)
+    else:
+        exec_query("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, str(value)), commit=True)
+
+def get_user(user_id: int):
+    return exec_query("SELECT * FROM users WHERE user_id = ?", (user_id,), fetch_one=True)
+
+def is_user_banned(user_id: int):
+    user = get_user(user_id)
+    if user and user.get("is_banned") == 1:
+        return True, user.get("ban_reason") or "Administrator tomonidan bloklangan"
+    return False, ""
+
+def ban_user(user_id: int, reason: str = "Qoidabuzarlik"):
+    exec_query("UPDATE users SET is_banned = 1, ban_reason = ? WHERE user_id = ?", (reason, user_id), commit=True)
+    return True
+
+def unban_user(user_id: int):
+    exec_query("UPDATE users SET is_banned = 0, ban_reason = '' WHERE user_id = ?", (user_id,), commit=True)
+    return True
+
+def get_all_users_count() -> int:
+    row = exec_query("SELECT COUNT(*) as cnt FROM users", fetch_one=True)
+    return row["cnt"] if row else 0
+
+def get_banned_users_count() -> int:
+    row = exec_query("SELECT COUNT(*) as cnt FROM users WHERE is_banned = 1", fetch_one=True)
+    return row["cnt"] if row else 0
+
+def get_banned_users(limit: int = 20):
+    return exec_query("SELECT user_id, first_name, username, ban_reason FROM users WHERE is_banned = 1 LIMIT ?", (limit,), fetch_all=True)
+
+def get_total_balance() -> int:
+    row = exec_query("SELECT SUM(balance) as total FROM users", fetch_one=True)
+    return row["total"] if row and row["total"] is not None else 0
+
+def get_total_games() -> int:
+    row = exec_query("SELECT COUNT(*) as cnt FROM game_history", fetch_one=True)
+    return row["cnt"] if row else 0
+
+def get_all_user_ids():
+    rows = exec_query("SELECT user_id FROM users", fetch_all=True)
+    return [r["user_id"] for r in rows] if rows else []
+
+def set_user_balance(user_id: int, balance: int):
+    exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (max(0, balance), user_id), commit=True)
+    user = get_user(user_id)
+    return user["balance"] if user else balance
+
+def add_user_balance(user_id: int, amount: int):
+    exec_query("UPDATE users SET balance = MAX(0, balance + ?) WHERE user_id = ?", (amount, user_id), commit=True)
+    user = get_user(user_id)
+    return user["balance"] if user else amount
 
 def get_or_create_user(user_id: int, first_name: str = "", username: str = "", referrer_id: int = None):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    row = cur.fetchone()
-
+    row = get_user(user_id)
     if not row:
         ref_id = None
         if referrer_id and referrer_id != user_id:
-            cur.execute("SELECT user_id FROM users WHERE user_id = ?", (referrer_id,))
-            if cur.fetchone():
+            parent = get_user(referrer_id)
+            if parent:
                 ref_id = referrer_id
 
-        cur.execute(
-            "INSERT INTO users (user_id, first_name, username, balance, referrer_id) VALUES (?, ?, ?, ?, ?)",
-            (user_id, first_name or "O'yinchi", username or "", 50000, ref_id)
-        )
-        if ref_id:
-            cur.execute(
-                "UPDATE users SET balance = balance + 5000, invited_count = invited_count + 1, total_earned_ref = total_earned_ref + 5000 WHERE user_id = ?",
-                (ref_id,)
+        if USE_POSTGRES:
+            exec_query(
+                "INSERT INTO users (user_id, first_name, username, balance, referrer_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT (user_id) DO NOTHING",
+                (user_id, first_name or "O'yinchi", username or "", 10000, ref_id),
+                commit=True
             )
-        conn.commit()
+        else:
+            exec_query(
+                "INSERT OR IGNORE INTO users (user_id, first_name, username, balance, referrer_id) VALUES (?, ?, ?, ?, ?)",
+                (user_id, first_name or "O'yinchi", username or "", 10000, ref_id),
+                commit=True
+            )
 
-        cur.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-        row = cur.fetchone()
+        if ref_id:
+            exec_query(
+                "UPDATE users SET balance = balance + 2000, invited_count = invited_count + 1, total_earned_ref = total_earned_ref + 2000 WHERE user_id = ?",
+                (ref_id,),
+                commit=True
+            )
+            update_task_progress(ref_id, "invite_friend", 1)
 
-    result = dict(row)
-    conn.close()
-
-    if not row and ref_id:
-        update_task_progress(ref_id, "invite_friend", 1)
+        row = get_user(user_id)
 
     ensure_daily_tasks(user_id)
-    return result
+    return row
 
 def ensure_daily_tasks(user_id: int):
     today = date.today().isoformat()
-    conn = get_connection()
-    cur = conn.cursor()
-
     default_tasks = [
-        ("login_daily", "Kunlik kirish bonusi", 3000, 1),
-        ("play_games", "5 ta istalgan o'yin o'ynash", 7000, 5),
-        ("reach_multiplier", "2.00x dan yuqori yutuq olish", 10000, 1),
-        ("invite_friend", "1 ta do'stni taklif qilish (+5000 UZS)", 5000, 1),
-        ("high_stake", "Kamida 10 000 UZS stavka qilish", 8000, 1)
+        ("login_daily", "Kunlik kirish bonusi", 1000, 1),
+        ("play_games", "5 ta istalgan o'yin o'ynash", 2000, 5),
+        ("reach_multiplier", "2.00x dan yuqori yutuq olish", 2500, 1),
+        ("invite_friend", "1 ta do'stni taklif qilish (+2000 UZS)", 2000, 1),
+        ("high_stake", "Kamida 10 000 UZS stavka qilish", 3000, 1)
     ]
 
     for key, title, reward, target in default_tasks:
-        cur.execute("""
-            INSERT OR IGNORE INTO daily_tasks 
-            (user_id, task_key, title, reward, current_val, target_val, completed, claimed, task_date)
-            VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?)
-        """, (user_id, key, title, reward, target, today))
-        
-    cur.execute("UPDATE daily_tasks SET current_val = 1, completed = 1 WHERE user_id = ? AND task_key = 'login_daily' AND task_date = ?", (user_id, today))
-    conn.commit()
-    conn.close()
+        if USE_POSTGRES:
+            exec_query("""
+                INSERT INTO daily_tasks 
+                (user_id, task_key, title, reward, current_val, target_val, completed, claimed, task_date)
+                VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?)
+                ON CONFLICT (user_id, task_key, task_date) DO NOTHING
+            """, (user_id, key, title, reward, target, today), commit=True)
+        else:
+            exec_query("""
+                INSERT OR IGNORE INTO daily_tasks 
+                (user_id, task_key, title, reward, current_val, target_val, completed, claimed, task_date)
+                VALUES (?, ?, ?, ?, 0, ?, 0, 0, ?)
+            """, (user_id, key, title, reward, target, today), commit=True)
+
+    exec_query("UPDATE daily_tasks SET current_val = 1, completed = 1 WHERE user_id = ? AND task_key = 'login_daily' AND task_date = ?", (user_id, today), commit=True)
 
 def update_task_progress(user_id: int, task_key: str, increment: int = 1):
     today = date.today().isoformat()
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
+    exec_query("""
         UPDATE daily_tasks 
-        SET current_val = MIN(target_val, current_val + ?),
+        SET current_val = LEAST(target_val, current_val + ?) if exists else current_val,
             completed = CASE WHEN (current_val + ?) >= target_val THEN 1 ELSE completed END
         WHERE user_id = ? AND task_key = ? AND task_date = ? AND completed = 0
-    """, (increment, increment, user_id, task_key, today))
-    conn.commit()
-    conn.close()
+    """ if False else """
+        UPDATE daily_tasks 
+        SET current_val = CASE WHEN (current_val + ?) > target_val THEN target_val ELSE (current_val + ?) END,
+            completed = CASE WHEN (current_val + ?) >= target_val THEN 1 ELSE completed END
+        WHERE user_id = ? AND task_key = ? AND task_date = ? AND completed = 0
+    """, (increment, increment, increment, user_id, task_key, today), commit=True)
 
 def claim_task(user_id: int, task_key: str):
     today = date.today().isoformat()
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
+    task = exec_query("""
         SELECT * FROM daily_tasks 
         WHERE user_id = ? AND task_key = ? AND task_date = ? AND completed = 1 AND claimed = 0
-    """, (user_id, task_key, today))
-    task = cur.fetchone()
+    """, (user_id, task_key, today), fetch_one=True)
 
     if not task:
-        conn.close()
         return False, "Vazifa hali bajarilmagan yoki allaqachon olingan"
 
     reward = task["reward"]
-    cur.execute("UPDATE daily_tasks SET claimed = 1 WHERE id = ?", (task["id"],))
-    cur.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (reward, user_id))
-    conn.commit()
-    conn.close()
+    exec_query("UPDATE daily_tasks SET claimed = 1 WHERE id = ?", (task["id"],), commit=True)
+    exec_query("UPDATE users SET balance = balance + ? WHERE user_id = ?", (reward, user_id), commit=True)
     return True, reward
 
 def get_user_tasks(user_id: int):
     today = date.today().isoformat()
     ensure_daily_tasks(user_id)
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM daily_tasks WHERE user_id = ? AND task_date = ?", (user_id, today))
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
+    return exec_query("SELECT * FROM daily_tasks WHERE user_id = ? AND task_date = ? ORDER BY id ASC", (user_id, today), fetch_all=True)
 
 def use_promocode(user_id: int, code: str):
     code = code.strip().upper()
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM promocodes WHERE code = ?", (code,))
-    promo = cur.fetchone()
+    promo = exec_query("SELECT * FROM promocodes WHERE code = ?", (code,), fetch_one=True)
     if not promo:
-        conn.close()
         return False, "Bunday promokod mavjud emas"
 
     if promo["used_count"] >= promo["max_uses"]:
-        conn.close()
         return False, "Promokod limiti tugagan"
 
-    cur.execute("SELECT * FROM promo_uses WHERE user_id = ? AND code = ?", (user_id, code))
-    if cur.fetchone():
-        conn.close()
+    used = exec_query("SELECT * FROM promo_uses WHERE user_id = ? AND code = ?", (user_id, code), fetch_one=True)
+    if used:
         return False, "Siz bu promokoddan foydalangansiz"
 
-    cur.execute("INSERT INTO promo_uses (user_id, code) VALUES (?, ?)", (user_id, code))
-    cur.execute("UPDATE promocodes SET used_count = used_count + 1 WHERE code = ?", (code,))
-    cur.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (promo["amount"], user_id))
-    conn.commit()
-    conn.close()
+    exec_query("INSERT INTO promo_uses (user_id, code) VALUES (?, ?)", (user_id, code), commit=True)
+    exec_query("UPDATE promocodes SET used_count = used_count + 1 WHERE code = ?", (code,), commit=True)
+    exec_query("UPDATE users SET balance = balance + ? WHERE user_id = ?", (promo["amount"], user_id), commit=True)
     return True, promo["amount"]
 
 def create_promocode(code: str, amount: int, max_uses: int = 100):
     code = code.strip().upper()
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO promocodes (code, amount, max_uses, used_count) VALUES (?, ?, ?, 0)", (code, amount, max_uses))
-    conn.commit()
-    conn.close()
+    if USE_POSTGRES:
+        exec_query("INSERT INTO promocodes (code, amount, max_uses, used_count) VALUES (?, ?, ?, 0) ON CONFLICT (code) DO UPDATE SET amount = EXCLUDED.amount, max_uses = EXCLUDED.max_uses", (code, amount, max_uses), commit=True)
+    else:
+        exec_query("INSERT OR REPLACE INTO promocodes (code, amount, max_uses, used_count) VALUES (?, ?, ?, 0)", (code, amount, max_uses), commit=True)
     return True
 
+def get_all_promocodes():
+    return exec_query("SELECT * FROM promocodes ORDER BY created_at DESC", fetch_all=True)
+
 def update_user_balance(user_id: int, diff: int):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("UPDATE users SET balance = MAX(0, balance + ?) WHERE user_id = ?", (diff, user_id))
-    cur.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
-    res = cur.fetchone()
-    conn.commit()
-    conn.close()
-    if not res:
+    exec_query("UPDATE users SET balance = CASE WHEN (balance + ?) < 0 THEN 0 ELSE (balance + ?) END WHERE user_id = ?", (diff, diff, user_id), commit=True)
+    user = get_user(user_id)
+    if not user:
         get_or_create_user(user_id)
         return update_user_balance(user_id, diff)
-    return res["balance"]
+    return user["balance"]
 
 def record_game(user_id: int, game_name: str, bet: int, win: int, multiplier: float):
     seed = f"{user_id}-{game_name}-{time.time()}-{bet}-{win}"
     provably_hash = hashlib.sha256(seed.encode("utf-8")).hexdigest()
-    
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
+
+    exec_query("""
         INSERT INTO game_history (user_id, game_name, bet, win, multiplier, provably_hash)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (user_id, game_name, bet, win, multiplier, provably_hash))
-    conn.commit()
-    conn.close()
+    """, (user_id, game_name, bet, win, multiplier, provably_hash), commit=True)
 
     update_task_progress(user_id, "play_games", 1)
     if bet >= 10000:

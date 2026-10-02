@@ -64,6 +64,10 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
             if uid <= 0:
                 uid = 999999
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
             first_name = query.get("first_name", ["Pilot"])[0]
             username = query.get("username", [""])[0]
             ref_id_str = query.get("ref", ["0"])[0]
@@ -77,6 +81,10 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
             if uid <= 0:
                 uid = 999999
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
             tasks = database.get_user_tasks(uid)
             return self.send_json({"ok": True, "tasks": tasks})
 
@@ -84,11 +92,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
             if uid <= 0:
                 uid = 999999
-            conn = database.get_connection()
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM game_history WHERE user_id = ? ORDER BY id DESC LIMIT 20", (uid,))
-            rows = [dict(r) for r in cur.fetchall()]
-            conn.close()
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
+            rows = database.exec_query("SELECT * FROM game_history WHERE user_id = ? ORDER BY id DESC LIMIT 20", (uid,), fetch_all=True)
             return self.send_json({"ok": True, "history": rows})
 
         super().do_GET()
@@ -108,6 +116,10 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(data.get("user_id"), 999999)
             if uid <= 0:
                 uid = 999999
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
             code = str(data.get("code", ""))
             ok, msg_or_amt = database.use_promocode(uid, code)
             if ok:
@@ -120,6 +132,10 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(data.get("user_id"), 999999)
             if uid <= 0:
                 uid = 999999
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
             task_key = str(data.get("task_key", ""))
             ok, res = database.claim_task(uid, task_key)
             if ok:
@@ -133,6 +149,10 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(data.get("user_id"), 999999)
             if uid <= 0:
                 uid = 999999
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
             game_name = str(data.get("game_name", "kamikaze"))
             bet = safe_int(data.get("bet"), 0)
             win = safe_int(data.get("win"), 0)
@@ -154,7 +174,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             uid = safe_int(data.get("user_id"), 999999)
             if uid <= 0:
                 uid = 999999
-            amt = safe_int(data.get("amount"), 50000)
+            is_banned, ban_reason = database.is_user_banned(uid)
+            if is_banned:
+                return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
+
+            amt = safe_int(data.get("amount"), 10000)
             new_bal = database.update_user_balance(uid, amt)
             return self.send_json({"ok": True, "balance": new_bal})
 

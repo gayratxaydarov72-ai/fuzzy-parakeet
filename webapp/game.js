@@ -45,7 +45,7 @@ const APPLE_ODDS = [1.23, 1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.96, 69.91, 349
 const APPLE_MINES_PER_ROW = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4];
 
 const appState = {
-  balance: 50000,
+  balance: 10000,
   user: null,
   sound: localStorage.getItem("one_sound") !== "false",
   lastHash: "SHA-256 Kripto himoya yoqilgan",
@@ -515,7 +515,17 @@ async function apiFetch(endpoint, method = "GET", body = null) {
     const opts = { method, headers: { "Content-Type": "application/json" } };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(endpoint, opts);
-    return await res.json();
+    const json = await res.json();
+    if (json?.banned) {
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:24px;text-align:center;background:#0d1117;color:#fff;font-family:sans-serif;">
+          <div style="font-size:64px;margin-bottom:16px;">🚫</div>
+          <h2 style="color:#ff4757;margin-bottom:12px;">HISOBINGIZ BLOKLANGAN</h2>
+          <p style="font-size:15px;color:#a4b0be;line-height:1.6;max-width:320px;">${json.error || "Administrator tomonidan bloklangan"}</p>
+        </div>
+      `;
+    }
+    return json;
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -1774,11 +1784,11 @@ document.getElementById("shareTgBtn").addEventListener("click", () => {
 document.getElementById("topupBtn").addEventListener("click", async () => {
   audio.play("click");
   triggerHaptic("light");
-  const res = await apiFetch("/api/topup", "POST", { user_id: USER_ID, amount: 50000 });
+  const res = await apiFetch("/api/topup", "POST", { user_id: USER_ID, amount: 10000 });
   if (res?.ok) {
     audio.play("win");
     updateBalanceUI(res.balance);
-    showToast("💰 +50 000 UZS balansga qo'shildi!", true);
+    showToast("💰 +10 000 UZS balansga qo'shildi!", true);
   }
 });
 
@@ -1846,7 +1856,7 @@ function getMinesMultiplier(minesCount, openedCount) {
   for (let i = 0; i < openedCount; i++) {
     prob *= (25 - minesCount - i) / (25 - i);
   }
-  const fair = 0.97 / prob;
+  const fair = 0.93 / prob;
   return Math.max(1.01, parseFloat(fair.toFixed(2)));
 }
 
@@ -2083,7 +2093,7 @@ document.getElementById("thimMode1")?.addEventListener("click", () => {
   document.getElementById("thimMode1").classList.add("active");
   document.getElementById("thimMode2").classList.remove("active");
   appState.th.mode = 1;
-  document.getElementById("thimblesModeBadge").textContent = "x2.91";
+  document.getElementById("thimblesModeBadge").textContent = "x2.80";
 });
 
 document.getElementById("thimMode2")?.addEventListener("click", () => {
@@ -2092,7 +2102,7 @@ document.getElementById("thimMode2")?.addEventListener("click", () => {
   document.getElementById("thimMode2").classList.add("active");
   document.getElementById("thimMode1").classList.remove("active");
   appState.th.mode = 2;
-  document.getElementById("thimblesModeBadge").textContent = "x1.45";
+  document.getElementById("thimblesModeBadge").textContent = "x1.40";
 });
 
 document.querySelectorAll("#view-thimbles .b-chip").forEach(c => {
@@ -2228,7 +2238,7 @@ async function onThimbleClick(cupIndex) {
   });
 
   const isWin = appState.th.ballPositions.includes(cupIndex);
-  const mult = appState.th.mode === 1 ? 2.91 : 1.45;
+  const mult = appState.th.mode === 1 ? 2.80 : 1.40;
 
   if (isWin) {
     const winSum = Math.floor(appState.th.bet * mult);
@@ -2429,13 +2439,13 @@ async function rollDiceGame() {
 
       if (appState.dc.choice === "under" && sum < 7) {
         won = true;
-        mult = 2.30;
+        mult = 2.10;
       } else if (appState.dc.choice === "exact" && sum === 7) {
         won = true;
-        mult = 5.80;
+        mult = 5.20;
       } else if (appState.dc.choice === "over" && sum > 7) {
         won = true;
-        mult = 2.30;
+        mult = 2.10;
       }
 
       finishDiceGame(won, mult, sum);
