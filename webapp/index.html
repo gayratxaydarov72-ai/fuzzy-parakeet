@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -150,7 +150,7 @@
             <span class="b-lbl">Stavka:</span>
             <div class="b-input-wrap">
               <button class="btn-b-step" id="kmMinus">-</button>
-              <input type="number" id="kmBetInput" value="5000" min="1000" step="1000">
+              <input type="number" id="kmBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
               <span class="b-curr">UZS</span>
               <button class="btn-b-step" id="kmPlus">+</button>
             </div>
@@ -191,7 +191,7 @@
             <span class="b-lbl">Stavka:</span>
             <div class="b-input-wrap">
               <button class="btn-b-step" id="apMinus">-</button>
-              <input type="number" id="apBetInput" value="5000" min="1000" step="1000">
+              <input type="number" id="apBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
               <span class="b-curr">UZS</span>
               <button class="btn-b-step" id="apPlus">+</button>
             </div>
@@ -227,7 +227,7 @@
             <span class="b-lbl">Stavka:</span>
             <div class="b-input-wrap">
               <button class="btn-b-step" id="crMinus">-</button>
-              <input type="number" id="crBetInput" value="5000" min="1000" step="1000">
+              <input type="number" id="crBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
               <span class="b-curr">UZS</span>
               <button class="btn-b-step" id="crPlus">+</button>
             </div>
@@ -289,7 +289,7 @@
             <span class="b-lbl">Stavka:</span>
             <div class="b-input-wrap">
               <button class="btn-b-step" id="mnMinus">-</button>
-              <input type="number" id="mnBetInput" value="5000" min="1000" step="1000">
+              <input type="number" id="mnBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
               <span class="b-curr">UZS</span>
               <button class="btn-b-step" id="mnPlus">+</button>
             </div>
@@ -375,7 +375,7 @@
             <span class="b-lbl">Stavka:</span>
             <div class="b-input-wrap">
               <button class="btn-b-step" id="thMinus">-</button>
-              <input type="number" id="thBetInput" value="5000" min="1000" step="1000">
+              <input type="number" id="thBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
               <span class="b-curr">UZS</span>
               <button class="btn-b-step" id="thPlus">+</button>
             </div>
@@ -435,7 +435,7 @@
             <span class="b-lbl">Stavka:</span>
             <div class="b-input-wrap">
               <button class="btn-b-step" id="dcMinus">-</button>
-              <input type="number" id="dcBetInput" value="5000" min="1000" step="1000">
+              <input type="number" id="dcBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
               <span class="b-curr">UZS</span>
               <button class="btn-b-step" id="dcPlus">+</button>
             </div>
@@ -580,6 +580,6 @@
 
   </div>
 
-  <script src="game.js"></script>
+  <script src="game.js?v=3.0"></script>
 </body>
 </html>

@@ -11,7 +11,9 @@ if (tg) {
   } catch (e) {}
 }
 
-window.addEventListener("resize", () => {
+function syncViewportHeight() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
   try {
     tg?.expand?.();
   } catch (e) {}
@@ -19,7 +21,10 @@ window.addEventListener("resize", () => {
     crashCanvas.width = crashCanvas.parentElement.clientWidth;
     crashCanvas.height = crashCanvas.parentElement.clientHeight;
   }
-});
+}
+window.addEventListener("resize", syncViewportHeight);
+window.addEventListener("orientationchange", syncViewportHeight);
+syncViewportHeight();
 
 const urlParams = new URLSearchParams(window.location.search);
 let initialUid = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
@@ -802,13 +807,86 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   });
 });
 
+function getValidatedBet(inputElId) {
+  const el = document.getElementById(inputElId);
+  const val = parseInt(el?.value, 10);
+  if (isNaN(val) || val < 1000) {
+    showToast("⚠️ Minimal stavka: 1 000 UZS!", false);
+    triggerHaptic("error");
+    return null;
+  }
+  if (val > appState.balance) {
+    if (appState.balance <= 0) {
+      showToast("❌ Balansingiz 0 UZS! Yuqoridagi (+) tugmasini bosib hisobni to'ldiring.", false);
+    } else {
+      showToast(`❌ Mablag' yetarli emas! Sizda ${formatMoney(appState.balance)} UZS bor.`, false);
+    }
+    const topup = document.getElementById("topupBtn");
+    if (topup) {
+      topup.classList.add("pulse-attention");
+      setTimeout(() => topup.classList.remove("pulse-attention"), 1500);
+    }
+    triggerHaptic("error");
+    return null;
+  }
+  return val;
+}
+
+function adjustBetInput(inputId, action) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  audio.play("click");
+  triggerHaptic("light");
+  let v = parseInt(el.value, 10) || 5000;
+  if (action === "minus") {
+    el.value = Math.max(1000, v - 1000);
+  } else if (action === "plus") {
+    el.value = Math.min(1000000, v + 1000);
+  } else if (action === "half") {
+    el.value = Math.max(1000, Math.floor(v / 2));
+  } else if (action === "double") {
+    el.value = Math.min(1000000, v * 2);
+  } else if (action === "max") {
+    el.value = Math.max(1000, appState.balance > 0 ? appState.balance : 50000);
+  }
+}
+
+function setBetChip(inputId, value) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  audio.play("click");
+  triggerHaptic("light");
+  el.value = value;
+}
+
 function openGameView(viewId) {
   audio.play("click");
+  triggerHaptic("medium");
+  document.getElementById("app")?.classList.add("in-game");
   document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
   document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
 
   const view = document.getElementById(viewId);
   if (view) view.style.display = "flex";
+
+  const betInputMap = {
+    "view-kamikaze": "kmBetInput",
+    "view-apple": "apBetInput",
+    "view-crash": "crBetInput",
+    "view-mines": "mnBetInput",
+    "view-thimbles": "thBetInput",
+    "view-dice": "dcBetInput"
+  };
+  const inputId = betInputMap[viewId];
+  if (inputId) {
+    const inputEl = document.getElementById(inputId);
+    if (inputEl) {
+      const cur = parseInt(inputEl.value, 10) || 5000;
+      if (appState.balance > 0 && cur > appState.balance) {
+        inputEl.value = Math.max(1000, Math.min(5000, appState.balance));
+      }
+    }
+  }
 
   if (viewId === "view-crash") {
     initCrashCanvas();
@@ -825,6 +903,8 @@ function openGameView(viewId) {
 
 function returnToLobby() {
   audio.play("click");
+  triggerHaptic("light");
+  document.getElementById("app")?.classList.remove("in-game");
   document.querySelectorAll(".game-arena-view").forEach(v => v.style.display = "none");
   document.getElementById("tab-lobby").classList.add("active");
   document.querySelector('.tab-btn[data-tab="lobby"]').classList.add("active");
@@ -946,12 +1026,8 @@ function updateKamikazeActiveRows() {
 let kmResetTimer = null;
 function startKamikazeGame() {
   clearTimeout(kmResetTimer);
-  audio.play("click");
-  const betVal = parseInt(document.getElementById("kmBetInput").value, 10);
-  if (isNaN(betVal) || betVal < 1000 || betVal > appState.balance) {
-    showToast("Balans yetarli emas yoki stavka noto'g'ri!", false);
-    return;
-  }
+  const betVal = getValidatedBet("kmBetInput");
+  if (!betVal) return;
 
   appState.km.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
@@ -1126,43 +1202,33 @@ document.getElementById("kmCashoutBtn").addEventListener("click", cashoutKamikaz
 document.querySelectorAll("#view-kamikaze .b-chip").forEach(c => {
   c.addEventListener("click", () => {
     if (appState.km.playing) return;
-    audio.play("click");
-    document.getElementById("kmBetInput").value = c.dataset.v;
+    setBetChip("kmBetInput", c.dataset.v);
   });
 });
 
 document.getElementById("kmMinus").addEventListener("click", () => {
   if (appState.km.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("kmBetInput").value, 10) || 5000;
-  document.getElementById("kmBetInput").value = Math.max(1000, v - 1000);
+  adjustBetInput("kmBetInput", "minus");
 });
 
 document.getElementById("kmPlus").addEventListener("click", () => {
   if (appState.km.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("kmBetInput").value, 10) || 5000;
-  document.getElementById("kmBetInput").value = Math.min(appState.balance, v + 1000);
+  adjustBetInput("kmBetInput", "plus");
 });
 
 document.getElementById("kmHalf").addEventListener("click", () => {
   if (appState.km.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("kmBetInput").value, 10) || 5000;
-  document.getElementById("kmBetInput").value = Math.max(1000, Math.floor(v / 2));
+  adjustBetInput("kmBetInput", "half");
 });
 
 document.getElementById("kmDouble").addEventListener("click", () => {
   if (appState.km.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("kmBetInput").value, 10) || 5000;
-  document.getElementById("kmBetInput").value = Math.min(appState.balance, v * 2);
+  adjustBetInput("kmBetInput", "double");
 });
 
 document.getElementById("kmMax").addEventListener("click", () => {
   if (appState.km.playing) return;
-  audio.play("click");
-  document.getElementById("kmBetInput").value = appState.balance;
+  adjustBetInput("kmBetInput", "max");
 });
 
 function renderAppleBoard() {
@@ -1221,12 +1287,8 @@ function updateAppleActiveRows() {
 let apResetTimer = null;
 function startAppleGame() {
   clearTimeout(apResetTimer);
-  audio.play("click");
-  const betVal = parseInt(document.getElementById("apBetInput").value, 10);
-  if (isNaN(betVal) || betVal < 1000 || betVal > appState.balance) {
-    showToast("Balans yetarli emas yoki stavka noto'g'ri!", false);
-    return;
-  }
+  const betVal = getValidatedBet("apBetInput");
+  if (!betVal) return;
 
   appState.ap.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
@@ -1391,43 +1453,33 @@ document.getElementById("appleCashoutBtn").addEventListener("click", cashoutAppl
 document.querySelectorAll("#view-apple .b-chip").forEach(c => {
   c.addEventListener("click", () => {
     if (appState.ap.playing) return;
-    audio.play("click");
-    document.getElementById("apBetInput").value = c.dataset.v;
+    setBetChip("apBetInput", c.dataset.v);
   });
 });
 
 document.getElementById("apMinus").addEventListener("click", () => {
   if (appState.ap.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("apBetInput").value, 10) || 5000;
-  document.getElementById("apBetInput").value = Math.max(1000, v - 1000);
+  adjustBetInput("apBetInput", "minus");
 });
 
 document.getElementById("apPlus").addEventListener("click", () => {
   if (appState.ap.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("apBetInput").value, 10) || 5000;
-  document.getElementById("apBetInput").value = Math.min(appState.balance, v + 1000);
+  adjustBetInput("apBetInput", "plus");
 });
 
 document.getElementById("apHalf").addEventListener("click", () => {
   if (appState.ap.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("apBetInput").value, 10) || 5000;
-  document.getElementById("apBetInput").value = Math.max(1000, Math.floor(v / 2));
+  adjustBetInput("apBetInput", "half");
 });
 
 document.getElementById("apDouble").addEventListener("click", () => {
   if (appState.ap.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("apBetInput").value, 10) || 5000;
-  document.getElementById("apBetInput").value = Math.min(appState.balance, v * 2);
+  adjustBetInput("apBetInput", "double");
 });
 
 document.getElementById("apMax").addEventListener("click", () => {
   if (appState.ap.playing) return;
-  audio.play("click");
-  document.getElementById("apBetInput").value = appState.balance;
+  adjustBetInput("apBetInput", "max");
 });
 
 let crashCanvas, crashCtx;
@@ -1744,12 +1796,8 @@ function crashLoop(now) {
 
 function startCrashRound() {
   if (appState.cr.state === "countdown" || appState.cr.state === "flying") return;
-  audio.play("click");
-  const betVal = parseInt(document.getElementById("crBetInput").value, 10);
-  if (isNaN(betVal) || betVal < 1000 || betVal > appState.balance) {
-    showToast("Balans yetarli emas yoki stavka noto'g'ri!", false);
-    return;
-  }
+  const betVal = getValidatedBet("crBetInput");
+  if (!betVal) return;
 
   appState.cr.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
@@ -1939,43 +1987,33 @@ document.getElementById("crashActionBtn").addEventListener("click", () => {
 document.querySelectorAll("#view-crash .b-chip").forEach(c => {
   c.addEventListener("click", () => {
     if (appState.cr.state === "flying") return;
-    audio.play("click");
-    document.getElementById("crBetInput").value = c.dataset.v;
+    setBetChip("crBetInput", c.dataset.v);
   });
 });
 
 document.getElementById("crMinus").addEventListener("click", () => {
   if (appState.cr.state === "flying") return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("crBetInput").value, 10) || 5000;
-  document.getElementById("crBetInput").value = Math.max(1000, v - 1000);
+  adjustBetInput("crBetInput", "minus");
 });
 
 document.getElementById("crPlus").addEventListener("click", () => {
   if (appState.cr.state === "flying") return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("crBetInput").value, 10) || 5000;
-  document.getElementById("crBetInput").value = Math.min(appState.balance, v + 1000);
+  adjustBetInput("crBetInput", "plus");
 });
 
 document.getElementById("crHalf").addEventListener("click", () => {
   if (appState.cr.state === "flying") return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("crBetInput").value, 10) || 5000;
-  document.getElementById("crBetInput").value = Math.max(1000, Math.floor(v / 2));
+  adjustBetInput("crBetInput", "half");
 });
 
 document.getElementById("crDouble").addEventListener("click", () => {
   if (appState.cr.state === "flying") return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("crBetInput").value, 10) || 5000;
-  document.getElementById("crBetInput").value = Math.min(appState.balance, v * 2);
+  adjustBetInput("crBetInput", "double");
 });
 
 document.getElementById("crMax").addEventListener("click", () => {
   if (appState.cr.state === "flying") return;
-  audio.play("click");
-  document.getElementById("crBetInput").value = appState.balance;
+  adjustBetInput("crBetInput", "max");
 });
 
 function showResultModal(win, amount, desc) {
@@ -2159,50 +2197,45 @@ document.querySelectorAll("#view-mines .b-chip").forEach(c => {
   });
 });
 
+document.querySelectorAll("#view-mines .b-chip").forEach(c => {
+  c.addEventListener("click", () => {
+    if (appState.mn.playing) return;
+    setBetChip("mnBetInput", c.dataset.v);
+  });
+});
+
 document.getElementById("mnMinus")?.addEventListener("click", () => {
   if (appState.mn.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("mnBetInput").value, 10) || 5000;
-  document.getElementById("mnBetInput").value = Math.max(1000, v - 1000);
+  adjustBetInput("mnBetInput", "minus");
 });
 
 document.getElementById("mnPlus")?.addEventListener("click", () => {
   if (appState.mn.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("mnBetInput").value, 10) || 5000;
-  document.getElementById("mnBetInput").value = Math.min(appState.balance, v + 1000);
+  adjustBetInput("mnBetInput", "plus");
 });
 
 document.getElementById("mnHalf")?.addEventListener("click", () => {
   if (appState.mn.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("mnBetInput").value, 10) || 5000;
-  document.getElementById("mnBetInput").value = Math.max(1000, Math.floor(v / 2));
+  adjustBetInput("mnBetInput", "half");
 });
 
 document.getElementById("mnDouble")?.addEventListener("click", () => {
   if (appState.mn.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("mnBetInput").value, 10) || 5000;
-  document.getElementById("mnBetInput").value = Math.min(appState.balance, v * 2);
+  adjustBetInput("mnBetInput", "double");
 });
 
 document.getElementById("mnMax")?.addEventListener("click", () => {
   if (appState.mn.playing) return;
-  audio.play("click");
-  document.getElementById("mnBetInput").value = appState.balance;
+  adjustBetInput("mnBetInput", "max");
 });
 
 document.getElementById("mnStartBtn")?.addEventListener("click", startMinesGame);
 document.getElementById("minesCashoutBtn")?.addEventListener("click", cashoutMinesGame);
 
 function startMinesGame() {
-  audio.play("click");
-  const betVal = parseInt(document.getElementById("mnBetInput").value, 10);
-  if (isNaN(betVal) || betVal < 1000 || betVal > appState.balance) {
-    showToast("Balans yetarli emas yoki stavka noto'g'ri!", false);
-    return;
-  }
+  if (appState.mn.playing) return;
+  const betVal = getValidatedBet("mnBetInput");
+  if (!betVal) return;
 
   appState.mn.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
@@ -2384,43 +2417,33 @@ document.getElementById("thimMode2")?.addEventListener("click", () => {
 document.querySelectorAll("#view-thimbles .b-chip").forEach(c => {
   c.addEventListener("click", () => {
     if (appState.th.playing) return;
-    audio.play("click");
-    document.getElementById("thBetInput").value = c.dataset.v;
+    setBetChip("thBetInput", c.dataset.v);
   });
 });
 
 document.getElementById("thMinus")?.addEventListener("click", () => {
   if (appState.th.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("thBetInput").value, 10) || 5000;
-  document.getElementById("thBetInput").value = Math.max(1000, v - 1000);
+  adjustBetInput("thBetInput", "minus");
 });
 
 document.getElementById("thPlus")?.addEventListener("click", () => {
   if (appState.th.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("thBetInput").value, 10) || 5000;
-  document.getElementById("thBetInput").value = Math.min(appState.balance, v + 1000);
+  adjustBetInput("thBetInput", "plus");
 });
 
 document.getElementById("thHalf")?.addEventListener("click", () => {
   if (appState.th.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("thBetInput").value, 10) || 5000;
-  document.getElementById("thBetInput").value = Math.max(1000, Math.floor(v / 2));
+  adjustBetInput("thBetInput", "half");
 });
 
 document.getElementById("thDouble")?.addEventListener("click", () => {
   if (appState.th.playing) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("thBetInput").value, 10) || 5000;
-  document.getElementById("thBetInput").value = Math.min(appState.balance, v * 2);
+  adjustBetInput("thBetInput", "double");
 });
 
 document.getElementById("thMax")?.addEventListener("click", () => {
   if (appState.th.playing) return;
-  audio.play("click");
-  document.getElementById("thBetInput").value = appState.balance;
+  adjustBetInput("thBetInput", "max");
 });
 
 document.getElementById("cup0")?.addEventListener("click", () => onThimbleClick(0));
@@ -2437,12 +2460,9 @@ function resetThimblesUI() {
 }
 
 function startThimblesGame() {
-  audio.play("click");
-  const betVal = parseInt(document.getElementById("thBetInput").value, 10);
-  if (isNaN(betVal) || betVal < 1000 || betVal > appState.balance) {
-    showToast("Balans yetarli emas yoki stavka noto'g'ri!", false);
-    return;
-  }
+  if (appState.th.playing) return;
+  const betVal = getValidatedBet("thBetInput");
+  if (!betVal) return;
 
   appState.th.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
@@ -2636,56 +2656,41 @@ document.getElementById("choiceOver")?.addEventListener("click", () => {
 document.querySelectorAll("#view-dice .b-chip").forEach(c => {
   c.addEventListener("click", () => {
     if (appState.dc.rolling) return;
-    audio.play("click");
-    document.getElementById("dcBetInput").value = c.dataset.v;
+    setBetChip("dcBetInput", c.dataset.v);
   });
 });
 
 document.getElementById("dcMinus")?.addEventListener("click", () => {
   if (appState.dc.rolling) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("dcBetInput").value, 10) || 5000;
-  document.getElementById("dcBetInput").value = Math.max(1000, v - 1000);
+  adjustBetInput("dcBetInput", "minus");
 });
 
 document.getElementById("dcPlus")?.addEventListener("click", () => {
   if (appState.dc.rolling) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("dcBetInput").value, 10) || 5000;
-  document.getElementById("dcBetInput").value = Math.min(appState.balance, v + 1000);
+  adjustBetInput("dcBetInput", "plus");
 });
 
 document.getElementById("dcHalf")?.addEventListener("click", () => {
   if (appState.dc.rolling) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("dcBetInput").value, 10) || 5000;
-  document.getElementById("dcBetInput").value = Math.max(1000, Math.floor(v / 2));
+  adjustBetInput("dcBetInput", "half");
 });
 
 document.getElementById("dcDouble")?.addEventListener("click", () => {
   if (appState.dc.rolling) return;
-  audio.play("click");
-  let v = parseInt(document.getElementById("dcBetInput").value, 10) || 5000;
-  document.getElementById("dcBetInput").value = Math.min(appState.balance, v * 2);
+  adjustBetInput("dcBetInput", "double");
 });
 
 document.getElementById("dcMax")?.addEventListener("click", () => {
   if (appState.dc.rolling) return;
-  audio.play("click");
-  document.getElementById("dcBetInput").value = appState.balance;
+  adjustBetInput("dcBetInput", "max");
 });
 
 document.getElementById("diceRollBtn")?.addEventListener("click", rollDiceGame);
 
 async function rollDiceGame() {
   if (appState.dc.rolling) return;
-  audio.play("click");
-
-  const betVal = parseInt(document.getElementById("dcBetInput").value, 10);
-  if (isNaN(betVal) || betVal < 1000 || betVal > appState.balance) {
-    showToast("Balans yetarli emas yoki stavka noto'g'ri!", false);
-    return;
-  }
+  const betVal = getValidatedBet("dcBetInput");
+  if (!betVal) return;
 
   appState.dc.bet = betVal;
   updateBalanceUI(appState.balance - betVal);

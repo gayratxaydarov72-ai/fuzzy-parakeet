@@ -54,7 +54,7 @@ class SecurityLimiter:
         self.user_topups = {}
         self.blocked_ips = {}
 
-    def is_ip_allowed(self, ip: str, max_requests: int = 150, window_secs: int = 10) -> bool:
+    def is_ip_allowed(self, ip: str, max_requests: int = 300, window_secs: int = 10) -> bool:
         now = time.time()
         with self.lock:
             if ip in self.blocked_ips:
@@ -71,7 +71,7 @@ class SecurityLimiter:
             self.ip_hits[ip].append(now)
             return True
 
-    def is_user_allowed(self, user_id: int, max_actions: int = 10, window_secs: int = 2) -> bool:
+    def is_user_allowed(self, user_id: int, max_actions: int = 25, window_secs: int = 2) -> bool:
         if user_id <= 0:
             return True
         now = time.time()
@@ -131,6 +131,12 @@ def preload_static_assets():
 preload_static_assets()
 
 class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def address_string(self):
+        # Ultra-fast client IP resolution without blocking 2-second getfqdn reverse DNS
+        return str(self.client_address[0]) if self.client_address else "127.0.0.1"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
@@ -181,7 +187,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', mime)
         self.send_header('Content-Length', str(len(content)))
-        if path in ("/", "/index.html"):
+        if path in ("/", "/index.html") or path.endswith(".css") or path.endswith(".js"):
             self.send_header('Cache-Control', 'no-cache, must-revalidate')
         else:
             self.send_header('Cache-Control', 'public, max-age=300')
