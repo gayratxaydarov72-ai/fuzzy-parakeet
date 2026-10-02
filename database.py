@@ -10,46 +10,80 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 USE_POSTGRES = bool(DATABASE_URL and (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")))
+pg_pool = None
 
 if USE_POSTGRES:
     try:
         import psycopg2
         import psycopg2.extras
-    except ImportError:
+        import psycopg2.pool
+        pg_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=20,
+            dsn=DATABASE_URL,
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
+    except Exception as e:
+        print(f"[DB] PostgreSQL pool initialization failed ({e}). Falling back to SQLite.")
         USE_POSTGRES = False
+        pg_pool = None
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "1xbet_games.db")
 
 def get_connection():
-    if USE_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    if USE_POSTGRES and pg_pool:
+        conn = pg_pool.getconn()
         conn.autocommit = True
         return conn
     else:
-        conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
+        conn = sqlite3.connect(DB_PATH, timeout=20.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
         return conn
+
+def release_connection(conn):
+    if USE_POSTGRES and pg_pool and conn:
+        try:
+            pg_pool.putconn(conn)
+        except Exception:
+            pass
+    elif conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def _clean_row(row):
+    if not row:
+        return row
+    d = dict(row)
+    for k, v in d.items():
+        if hasattr(v, 'isoformat'):
+            d[k] = v.isoformat()
+    return d
 
 def exec_query(sql, params=(), fetch_one=False, fetch_all=False, commit=False):
     conn = get_connection()
-    cur = conn.cursor()
-    if USE_POSTGRES:
-        sql = sql.replace("?", "%s")
-    cur.execute(sql, params)
-    if commit and not USE_POSTGRES:
-        conn.commit()
+    try:
+        cur = conn.cursor()
+        if USE_POSTGRES:
+            sql = sql.replace("?", "%s")
+        cur.execute(sql, params)
+        if commit and not USE_POSTGRES:
+            conn.commit()
 
-    res = None
-    if fetch_one:
-        row = cur.fetchone()
-        res = dict(row) if row else None
-    elif fetch_all:
-        rows = cur.fetchall()
-        res = [dict(r) for r in rows] if rows else []
-
-    conn.close()
-    return res
+        res = None
+        if fetch_one:
+            row = cur.fetchone()
+            res = _clean_row(row) if row else None
+        elif fetch_all:
+            rows = cur.fetchall()
+            res = [_clean_row(r) for r in rows] if rows else []
+        cur.close()
+        return res
+    finally:
+        release_connection(conn)
 
 def init_db():
     conn = get_connection()
@@ -226,7 +260,16 @@ def init_db():
 
         conn.commit()
 
-    conn.close()
+    cur.close()
+    release_connection(conn)
+
+USER_CACHE = {}
+
+def invalidate_user_cache(user_id: int = None):
+    if user_id is None:
+        USER_CACHE.clear()
+    else:
+        USER_CACHE.pop(user_id, None)
 
 def get_setting(key: str, default: str = "") -> str:
     row = exec_query("SELECT value FROM system_settings WHERE key = ?", (key,), fetch_one=True)
@@ -241,7 +284,15 @@ def set_setting(key: str, value: str):
         exec_query("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, str(value)), commit=True)
 
 def get_user(user_id: int):
-    return exec_query("SELECT * FROM users WHERE user_id = ?", (user_id,), fetch_one=True)
+    now = time.time()
+    cached = USER_CACHE.get(user_id)
+    if cached and (now - cached["ts"] < 2.0):
+        return cached["data"]
+
+    u = exec_query("SELECT * FROM users WHERE user_id = ?", (user_id,), fetch_one=True)
+    if u:
+        USER_CACHE[user_id] = {"data": u, "ts": now}
+    return u
 
 def is_user_banned(user_id: int):
     user = get_user(user_id)
@@ -250,10 +301,12 @@ def is_user_banned(user_id: int):
     return False, ""
 
 def ban_user(user_id: int, reason: str = "Qoidabuzarlik"):
+    invalidate_user_cache(user_id)
     exec_query("UPDATE users SET is_banned = 1, ban_reason = ? WHERE user_id = ?", (reason, user_id), commit=True)
     return True
 
 def unban_user(user_id: int):
+    invalidate_user_cache(user_id)
     exec_query("UPDATE users SET is_banned = 0, ban_reason = '' WHERE user_id = ?", (user_id,), commit=True)
     return True
 
@@ -281,11 +334,13 @@ def get_all_user_ids():
     return [r["user_id"] for r in rows] if rows else []
 
 def set_user_balance(user_id: int, balance: int):
+    invalidate_user_cache(user_id)
     exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (max(0, balance), user_id), commit=True)
     user = get_user(user_id)
     return user["balance"] if user else balance
 
 def add_user_balance(user_id: int, amount: int):
+    invalidate_user_cache(user_id)
     exec_query("UPDATE users SET balance = MAX(0, balance + ?) WHERE user_id = ?", (amount, user_id), commit=True)
     user = get_user(user_id)
     return user["balance"] if user else amount
@@ -313,6 +368,7 @@ def get_or_create_user(user_id: int, first_name: str = "", username: str = "", r
             )
 
         if ref_id:
+            invalidate_user_cache(ref_id)
             exec_query(
                 "UPDATE users SET balance = balance + 2000, invited_count = invited_count + 1, total_earned_ref = total_earned_ref + 2000 WHERE user_id = ?",
                 (ref_id,),
@@ -320,6 +376,7 @@ def get_or_create_user(user_id: int, first_name: str = "", username: str = "", r
             )
             update_task_progress(ref_id, "invite_friend", 1)
 
+        invalidate_user_cache(user_id)
         row = get_user(user_id)
 
     ensure_daily_tasks(user_id)
@@ -328,6 +385,10 @@ def get_or_create_user(user_id: int, first_name: str = "", username: str = "", r
 def ensure_daily_tasks(user_id: int):
     today = date.today().isoformat()
     day_num = date.today().toordinal()
+
+    existing = exec_query("SELECT COUNT(*) as cnt FROM daily_tasks WHERE user_id = ? AND task_date = ?", (user_id, today), fetch_one=True)
+    if existing and existing.get("cnt", 0) >= 10:
+        return
 
     is_even = (day_num % 2 == 0)
 
@@ -382,6 +443,7 @@ def claim_task(user_id: int, task_key: str):
         return False, "Vazifa hali bajarilmagan yoki allaqachon olingan"
 
     reward = task["reward"]
+    invalidate_user_cache(user_id)
     exec_query("UPDATE daily_tasks SET claimed = 1 WHERE id = ?", (task["id"],), commit=True)
     exec_query("UPDATE users SET balance = balance + ? WHERE user_id = ?", (reward, user_id), commit=True)
     return True, reward
@@ -397,6 +459,7 @@ def claim_all_tasks(user_id: int):
         return False, 0
 
     total_reward = 0
+    invalidate_user_cache(user_id)
     for t in tasks:
         total_reward += t["reward"]
         exec_query("UPDATE daily_tasks SET claimed = 1 WHERE id = ?", (t["id"],), commit=True)
@@ -422,6 +485,7 @@ def use_promocode(user_id: int, code: str):
     if used:
         return False, "Siz bu promokoddan foydalangansiz"
 
+    invalidate_user_cache(user_id)
     exec_query("INSERT INTO promo_uses (user_id, code) VALUES (?, ?)", (user_id, code), commit=True)
     exec_query("UPDATE promocodes SET used_count = used_count + 1 WHERE code = ?", (code,), commit=True)
     exec_query("UPDATE users SET balance = balance + ? WHERE user_id = ?", (promo["amount"], user_id), commit=True)
@@ -439,6 +503,7 @@ def get_all_promocodes():
     return exec_query("SELECT * FROM promocodes ORDER BY created_at DESC", fetch_all=True)
 
 def update_user_balance(user_id: int, diff: int):
+    invalidate_user_cache(user_id)
     exec_query("UPDATE users SET balance = CASE WHEN (balance + ?) < 0 THEN 0 ELSE (balance + ?) END WHERE user_id = ?", (diff, diff, user_id), commit=True)
     user = get_user(user_id)
     if not user:

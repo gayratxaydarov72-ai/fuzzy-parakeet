@@ -55,7 +55,12 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def send_json(self, data, status=200):
-        body = json.dumps(data).encode('utf-8')
+        def json_serial(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return str(obj)
+
+        body = json.dumps(data, default=json_serial).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
@@ -66,6 +71,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
+
+        if path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
 
         if path == "/api/user":
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
