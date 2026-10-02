@@ -37,8 +37,10 @@ if os.path.exists(env_path):
 
 PORT = int(os.getenv("PORT", "8080"))
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+ADMIN_ID = 7271080503
+
 def get_all_admin_ids() -> set:
-    ids = {7271080503}
+    ids = {ADMIN_ID}
     env_admin = os.getenv("ADMIN_ID", "7271080503").strip()
     if env_admin:
         for p in env_admin.replace(";", ",").split(","):
