@@ -2130,14 +2130,18 @@ function setCrashMode(mode) {
   }
 }
 
+let crashTabsBound = false;
 function initCrashGame() {
   initCrashCanvas();
   if (!appState.cr.animId) {
     appState.cr.animId = requestAnimationFrame(crashLoop);
   }
-  document.getElementById("crTabOnline")?.addEventListener("click", () => setCrashMode("online"));
-  document.getElementById("crTabOffline")?.addEventListener("click", () => setCrashMode("offline"));
-  setCrashMode("online");
+  if (!crashTabsBound) {
+    document.getElementById("crTabOnline")?.addEventListener("click", () => setCrashMode("online"));
+    document.getElementById("crTabOffline")?.addEventListener("click", () => setCrashMode("offline"));
+    crashTabsBound = true;
+  }
+  setCrashMode(appState.cr.mode || "online");
 }
 
 function startCrashRound() {
@@ -3660,7 +3664,7 @@ function renderCoinFlipHistory(hist) {
     const badge = document.createElement("span");
     const isHeads = res === "heads";
     badge.className = `cf-h-badge ${isHeads ? "heads" : "tails"}`;
-    badge.textContent = isHeads ? "🦅" : "👑";
+    badge.textContent = isHeads ? "B" : "G";
     badge.title = isHeads ? "Burgut (1.96x)" : "Gerb (1.96x)";
     strip.appendChild(badge);
   });
@@ -3724,7 +3728,7 @@ async function playCoinFlip() {
 
   animate3dCoin(result, async () => {
     const isWin = result === choice;
-    const resName = result === "heads" ? "🦅 BURGUT" : "👑 GERB";
+    const resName = result === "heads" ? "BURGUT (1.96x)" : "GERB (1.96x)";
 
     if (!Array.isArray(appState.cf.history)) appState.cf.history = [];
     appState.cf.history.unshift(result);

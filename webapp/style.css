@@ -2404,6 +2404,7 @@ button, input, select, textarea {
   position: relative;
   width: clamp(260px, 68vw, 320px);
   height: clamp(260px, 68vw, 320px);
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2412,6 +2413,8 @@ button, input, select, textarea {
 #wheelCanvas {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
   display: block;
   filter: drop-shadow(0 0 16px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 8px rgba(255, 215, 0, 0.2));
   border-radius: 50%;
@@ -2553,17 +2556,25 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  border: 1.5px solid #d4ac0d;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  font-weight: 900;
+  font-family: 'Oswald', 'Roboto', sans-serif;
+  letter-spacing: 0.5px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.7);
 }
 
 .cf-h-badge.heads {
-  background: linear-gradient(135deg, #ffd700, #b8860b);
+  background: radial-gradient(circle at 35% 35%, #fff3a8 0%, #ffd700 50%, #b8860b 100%);
+  border: 1.5px solid #ffeaa7;
+  color: #3b2200;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .cf-h-badge.tails {
-  background: linear-gradient(135deg, #e67e22, #964d02);
+  background: radial-gradient(circle at 35% 35%, #ffe6cc 0%, #e67e22 50%, #964d02 100%);
+  border: 1.5px solid #ffbe76;
+  color: #2b1100;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .cf-coin-stage {
