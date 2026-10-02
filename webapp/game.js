@@ -70,7 +70,7 @@ const KAMIKAZE_ODDS = {
 };
 
 const APPLE_ODDS = [1.23, 1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.96, 69.91, 349.57];
-const APPLE_MINES_PER_ROW = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4];
+const APPLE_MINES_PER_ROW = [2, 2, 2, 2, 3, 3, 3, 4, 4, 4];
 
 const appState = {
   balance: 10000,
@@ -82,7 +82,7 @@ const appState = {
   aviatorTarget: 1.00,
 
   km: {
-    mines: 1,
+    mines: 2,
     row: 0,
     bet: 5000,
     playing: false,
@@ -116,7 +116,7 @@ const appState = {
   },
 
   mn: {
-    mines: 3,
+    mines: 5,
     bet: 5000,
     playing: false,
     grid: [],
@@ -1101,8 +1101,10 @@ function startKamikazeGame() {
   appState.km.grid = [];
   for (let r = 0; r < 10; r++) {
     const row = new Array(5).fill(false);
+    let rowBombs = appState.km.mines;
+    if (r >= 4 && rowBombs < 4) rowBombs += 1;
     let p = 0;
-    while (p < appState.km.mines) {
+    while (p < rowBombs) {
       const idx = Math.floor(Math.random() * 5);
       if (!row[idx]) {
         row[idx] = true;
@@ -1126,8 +1128,9 @@ function startKamikazeGame() {
 function onKamikazeClick(r, c, ev) {
   if (!appState.km.playing || r !== appState.km.row) return;
 
-  // EVIL MODE: ~75% chance to swap bomb into clicked cell
-  if (appState.evilMode && Math.random() < 0.75) {
+  // Smart house edge (~38% trap swap, 85% in evil mode)
+  const kmTrapChance = appState.evilMode ? 0.85 : 0.38;
+  if (Math.random() < kmTrapChance) {
     if (!appState.km.grid[r][c]) {
       const bombCols = [];
       for (let col = 0; col < 5; col++) {
@@ -1388,8 +1391,9 @@ function startAppleGame() {
 function onAppleClick(r, c, ev) {
   if (!appState.ap.playing || r !== appState.ap.row) return;
 
-  // EVIL MODE: ~75% chance to swap rotten apple into clicked cell
-  if (appState.evilMode && Math.random() < 0.75) {
+  // Smart house edge (~38% trap swap, 85% in evil mode)
+  const apTrapChance = appState.evilMode ? 0.85 : 0.38;
+  if (Math.random() < apTrapChance) {
     if (!appState.ap.grid[r][c]) {
       const rottenCols = [];
       for (let col = 0; col < 5; col++) {
@@ -1919,20 +1923,23 @@ function launchCrashFlight() {
     }
   } else if (appState.evilMode) {
     const r = Math.random();
-    if (r < 0.35) {
+    if (r < 0.45) {
       crashTarget = 1.00;
-    } else if (r < 0.85) {
-      crashTarget = Math.floor((1.01 + Math.random() * 0.28) * 100) / 100;
+    } else if (r < 0.88) {
+      crashTarget = Math.floor((1.01 + Math.random() * 0.22) * 100) / 100;
     } else {
-      crashTarget = Math.floor((1.30 + Math.random() * 0.60) * 100) / 100;
+      crashTarget = Math.floor((1.23 + Math.random() * 0.40) * 100) / 100;
     }
   } else {
     const rand = Math.random();
-    if (rand < 0.03) {
+    if (rand < 0.08) {
       crashTarget = 1.00;
+    } else if (rand < 0.42) {
+      crashTarget = Math.floor((1.01 + Math.random() * 0.35) * 100) / 100;
     } else {
-      crashTarget = Math.floor((0.99 / (1.0 - rand)) * 100) / 100;
-      if (crashTarget > 250) crashTarget = 250.00;
+      crashTarget = Math.floor((0.92 / (1.0 - ((rand - 0.42) / 0.58) * 0.94)) * 100) / 100;
+      if (crashTarget < 1.36) crashTarget = 1.36;
+      if (crashTarget > 180) crashTarget = 180.00;
     }
   }
   appState.cr.crashPoint = crashTarget;
@@ -2333,8 +2340,9 @@ function startMinesGame() {
 async function onMineTileClick(idx) {
   if (!appState.mn.playing || appState.mn.revealed[idx]) return;
 
-  // EVIL MODE: ~70% chance to swap unrevealed mine into clicked tile
-  if (appState.evilMode && Math.random() < 0.70) {
+  // Smart house edge (~36% trap swap after 1st diamond, 85% in evil mode)
+  const mnTrapChance = appState.evilMode ? 0.85 : 0.36;
+  if (Math.random() < mnTrapChance && (appState.mn.openedCount >= 1 || appState.evilMode)) {
     if (!appState.mn.grid[idx]) {
       const unrevealedMineIndices = [];
       for (let i = 0; i < 25; i++) {
@@ -2592,8 +2600,9 @@ async function onThimbleClick(cupIndex) {
   if (!appState.th.playing || appState.th.shuffling) return;
   appState.th.playing = false;
 
-  // EVIL MODE: ~75% chance to move ball away from picked cup
-  if (appState.evilMode && Math.random() < 0.75) {
+  // Smart house edge (~38% ball displacement, 85% in evil mode)
+  const thTrapChance = appState.evilMode ? 0.85 : 0.38;
+  if (Math.random() < thTrapChance) {
     if (appState.th.ballPositions.includes(cupIndex)) {
       const otherCups = [0, 1, 2].filter(c => c !== cupIndex);
       if (appState.th.mode === 1) {
@@ -2788,8 +2797,9 @@ async function rollDiceGame() {
       let final1 = Math.floor(Math.random() * 6) + 1;
       let final2 = Math.floor(Math.random() * 6) + 1;
 
-      // EVIL MODE: ~75% chance to force unfavorable dice sum
-      if (appState.evilMode && Math.random() < 0.75) {
+      // Smart house edge (~38% bias against player, 85% in evil mode)
+      const dcTrapChance = appState.evilMode ? 0.85 : 0.38;
+      if (Math.random() < dcTrapChance) {
         if (appState.dc.choice === "under") {
           final1 = Math.floor(Math.random() * 3) + 4;
           final2 = Math.floor(Math.random() * 4) + 3;
@@ -3101,18 +3111,18 @@ async function spinWheel() {
       targetIndex = winIndices[Math.floor(Math.random() * winIndices.length)];
     }
   } else {
-    // Normal fair weights
+    // Balanced weights with increased 0x sectors (~40% harder)
     const weights = [
-      14, // 0x
-      14, // 1.5x
-      12, // 2.0x
-      14, // 0x
-       9, // 3.0x
-      15, // 1.2x
-       8, // 5.0x
-      14, // 0x
-       4, // 10x
-       2  // 25x Jackpot
+      24, // 0x
+      12, // 1.5x
+      10, // 2.0x
+      24, // 0x
+       7, // 3.0x
+      13, // 1.2x
+       6, // 5.0x
+      24, // 0x
+       3, // 10x
+       1  // 25x Jackpot
     ];
     const totalW = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * totalW;
@@ -3600,12 +3610,9 @@ async function playCoinFlipOffline() {
   }
 
   const choice = appState.cf.choice || "heads";
-  let result = "heads";
-  if (appState.evilMode) {
-    result = Math.random() < 0.65 ? (choice === "heads" ? "tails" : "heads") : choice;
-  } else {
-    result = Math.random() < 0.5 ? "heads" : "tails";
-  }
+  const cfLossChance = appState.evilMode ? 0.75 : 0.58;
+  const isLoss = Math.random() < cfLossChance;
+  const result = isLoss ? (choice === "heads" ? "tails" : "heads") : choice;
 
   animate3dCoin(result, async () => {
     const isWin = result === choice;

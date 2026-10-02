@@ -156,13 +156,12 @@ class CoinFlipLiveRoom:
                         
                         evil = database.get_evil_mode()
                         real_user_bets = [b for b in self.bets.values() if b.get("is_real")]
-                        if evil and real_user_bets:
+                        if real_user_bets:
                             h_bets = sum(b["bet"] for b in real_user_bets if b["choice"] == "heads")
                             t_bets = sum(b["bet"] for b in real_user_bets if b["choice"] == "tails")
-                            if h_bets > t_bets:
-                                self.result = "tails"
-                            elif t_bets > h_bets:
-                                self.result = "heads"
+                            bias_prob = 0.85 if evil else 0.58
+                            if random.random() < bias_prob and h_bets != t_bets:
+                                self.result = "tails" if h_bets > t_bets else "heads"
                             else:
                                 self.result = "heads" if random.random() < 0.5 else "tails"
                         else:
