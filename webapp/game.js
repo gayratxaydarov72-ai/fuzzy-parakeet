@@ -455,8 +455,21 @@ class ParticleFX {
 const fx = new ParticleFX(document.getElementById("fx-canvas"));
 
 function formatMoney(n) {
+  if (typeof n !== "number" || isNaN(n)) return "0";
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
+
+(function restoreCachedBalance() {
+  try {
+    const cached = localStorage.getItem("nv_cached_balance");
+    if (cached !== null && !isNaN(parseInt(cached, 10))) {
+      const bVal = parseInt(cached, 10);
+      appState.balance = bVal;
+      const el = document.getElementById("balanceAmount");
+      if (el) el.textContent = formatMoney(bVal);
+    }
+  } catch (e) {}
+})();
 
 let toastTimer = null;
 function showToast(msg, isSuccess = true) {
@@ -485,6 +498,10 @@ function updateBalanceUI(val, animate = true) {
   if (!el) return;
   const prev = typeof appState.balance === "number" ? appState.balance : 0;
   appState.balance = val;
+
+  try {
+    localStorage.setItem("nv_cached_balance", String(val));
+  } catch (e) {}
 
   if (balanceAnimId) {
     cancelAnimationFrame(balanceAnimId);

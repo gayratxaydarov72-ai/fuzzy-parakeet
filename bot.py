@@ -469,13 +469,13 @@ async def command_start_handler(message: types.Message, command: CommandObject, 
         if ref_part.isdigit() and int(ref_part) != user_id:
             ref_id = int(ref_part)
 
-    user = database.get_or_create_user(user_id, first_name, username, ref_id)
+    user, is_new_ref = database.get_or_create_user(user_id, first_name, username, ref_id, return_is_new=True)
 
-    if ref_id:
+    if ref_id and is_new_ref:
         try:
             await bot.send_message(
                 chat_id=ref_id,
-                text=f"🎉 <b>Yangi do'st qo'shildi!</b>\n\nSizning havolangiz orqali <b>{first_name}</b> botga kirdi. Balansingizga <b>+2 000 UZS</b> bonus qo'shildi! 💰",
+                text=f"🎉 <b>Yangi do'st qo'shildi!</b>\n\nSizning havolangiz orqali <b>{first_name}</b> birinchi marta botga kirdi. Balansingizga <b>+2 000 UZS</b> bonus qo'shildi! 💰",
                 parse_mode="HTML"
             )
         except Exception:

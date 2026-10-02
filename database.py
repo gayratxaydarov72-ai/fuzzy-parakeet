@@ -123,6 +123,15 @@ def init_db():
         );
         """)
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS referral_history (
+            id SERIAL PRIMARY KEY,
+            referrer_id BIGINT,
+            referred_id BIGINT UNIQUE,
+            reward_amount INTEGER DEFAULT 2000,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS daily_tasks (
             id SERIAL PRIMARY KEY,
             user_id BIGINT,
@@ -209,6 +218,15 @@ def init_db():
             code TEXT,
             used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, code)
+        );
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS referral_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER,
+            referred_id INTEGER UNIQUE,
+            reward_amount INTEGER DEFAULT 2000,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
         cur.execute("""
@@ -345,14 +363,18 @@ def add_user_balance(user_id: int, amount: int):
     user = get_user(user_id)
     return user["balance"] if user else amount
 
-def get_or_create_user(user_id: int, first_name: str = "", username: str = "", referrer_id: int = None):
+def get_or_create_user(user_id: int, first_name: str = "", username: str = "", referrer_id: int = None, return_is_new: bool = False):
     row = get_user(user_id)
+    new_referral_reward = False
+
     if not row:
         ref_id = None
-        if referrer_id and referrer_id != user_id:
-            parent = get_user(referrer_id)
-            if parent:
-                ref_id = referrer_id
+        if referrer_id and int(referrer_id) != int(user_id):
+            parent = get_user(int(referrer_id))
+            if parent and parent.get("is_banned") != 1:
+                already_referred = exec_query("SELECT id FROM referral_history WHERE referred_id = ?", (user_id,), fetch_one=True)
+                if not already_referred:
+                    ref_id = int(referrer_id)
 
         if USE_POSTGRES:
             exec_query(
@@ -368,19 +390,35 @@ def get_or_create_user(user_id: int, first_name: str = "", username: str = "", r
             )
 
         if ref_id:
-            invalidate_user_cache(ref_id)
-            exec_query(
-                "UPDATE users SET balance = balance + 2000, invited_count = invited_count + 1, total_earned_ref = total_earned_ref + 2000 WHERE user_id = ?",
-                (ref_id,),
-                commit=True
-            )
-            update_task_progress(ref_id, "invite_friend", 1)
+            try:
+                if USE_POSTGRES:
+                    exec_query(
+                        "INSERT INTO referral_history (referrer_id, referred_id, reward_amount) VALUES (?, ?, 2000) ON CONFLICT (referred_id) DO NOTHING",
+                        (ref_id, user_id),
+                        commit=True
+                    )
+                else:
+                    exec_query(
+                        "INSERT OR IGNORE INTO referral_history (referrer_id, referred_id, reward_amount) VALUES (?, ?, 2000)",
+                        (ref_id, user_id),
+                        commit=True
+                    )
+                new_referral_reward = True
+                invalidate_user_cache(ref_id)
+                exec_query(
+                    "UPDATE users SET balance = balance + 2000, invited_count = invited_count + 1, total_earned_ref = total_earned_ref + 2000 WHERE user_id = ?",
+                    (ref_id,),
+                    commit=True
+                )
+                update_task_progress(ref_id, "invite_friend", 1)
+            except Exception:
+                new_referral_reward = False
 
         invalidate_user_cache(user_id)
         row = get_user(user_id)
 
     ensure_daily_tasks(user_id)
-    return row
+    return (row, new_referral_reward) if return_is_new else row
 
 def ensure_daily_tasks(user_id: int):
     today = date.today().isoformat()
