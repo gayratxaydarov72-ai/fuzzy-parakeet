@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.9">
+  <link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -370,7 +370,7 @@
       <div class="arena-header">
         <button class="back-btn" id="backFromThimbles">⬅ Orqaga</button>
         <span class="arena-title">THIMBLES NVINDIA</span>
-        <div class="thimbles-mode-badge" id="thimblesModeBadge">x2.91</div>
+        <div class="thimbles-mode-badge" id="thimblesModeBadge">x3.80</div>
       </div>
       <div class="thimbles-stage-wrap">
         <div class="thimbles-message" id="thimblesMsg">Stavka qiling va stakanlardan birini tanlang</div>
@@ -417,6 +417,17 @@
             </div>
             <div class="thimble-ball" id="ball2"></div>
           </div>
+          <div class="thimble-slot" data-index="3" id="cup3">
+            <div class="thimble-cup">
+              <svg viewBox="0 0 100 110" class="cup-svg">
+                <ellipse cx="50" cy="18" rx="28" ry="8" fill="#ffecb3" stroke="#8a6114" stroke-width="2"/>
+                <path d="M22 18 L32 96 Q50 102 68 96 L78 18 Z" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="2"/>
+                <ellipse cx="50" cy="95" rx="18" ry="5" fill="#ffd54f"/>
+                <circle cx="50" cy="10" r="7" fill="url(#cupGrad)" stroke="#5d3b07" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div class="thimble-ball" id="ball3"></div>
+          </div>
         </div>
       </div>
       <div class="arena-footer">
@@ -424,8 +435,8 @@
           <div class="thimbles-mode-selector">
             <span class="b-lbl">Rejim:</span>
             <div class="trap-buttons">
-              <button class="btn-trap active" id="thimMode1" data-mode="1">1 ta shar (x2.91)</button>
-              <button class="btn-trap" id="thimMode2" data-mode="2">2 ta shar (x1.45)</button>
+              <button class="btn-trap active" id="thimMode1" data-mode="1">1 ta shar (x3.80)</button>
+              <button class="btn-trap" id="thimMode2" data-mode="2">2 ta shar (x1.90)</button>
             </div>
           </div>
           <div class="bet-row">
@@ -882,6 +893,6 @@
 
   </div>
 
-  <script src="game.js?v=3.9"></script>
+  <script src="game.js?v=4.0"></script>
 </body>
 </html>

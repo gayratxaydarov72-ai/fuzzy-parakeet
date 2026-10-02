@@ -1783,15 +1783,15 @@ button, input, select, textarea {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: clamp(10px, 4vw, 20px);
+  gap: clamp(6px, 2.2vw, 12px);
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
   height: clamp(100px, 18vh, 140px);
   position: relative;
 }
 
 .thimble-slot {
-  width: clamp(70px, 24vw, 90px);
+  width: clamp(52px, 18vw, 76px);
   height: 100%;
   position: relative;
   display: flex;
@@ -1800,7 +1800,7 @@ button, input, select, textarea {
   justify-content: flex-end;
   cursor: pointer;
   touch-action: manipulation;
-  transition: transform 0.2s ease;
+  transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .thimble-slot:hover .thimble-cup {
@@ -1808,8 +1808,8 @@ button, input, select, textarea {
 }
 
 .thimble-cup {
-  width: clamp(66px, 22vw, 82px);
-  height: clamp(74px, 15vh, 90px);
+  width: clamp(50px, 17vw, 72px);
+  height: clamp(62px, 14vh, 82px);
   position: absolute;
   bottom: 0;
   z-index: 2;
@@ -1827,8 +1827,8 @@ button, input, select, textarea {
 }
 
 .thimble-ball {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #ff7675, #d63031 65%, #630809 100%);
   box-shadow: 0 0 12px rgba(214, 48, 49, 0.9), inset 0 2px 4px rgba(255, 255, 255, 0.4);

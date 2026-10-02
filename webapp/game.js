@@ -2830,7 +2830,7 @@ document.getElementById("thimMode1")?.addEventListener("click", () => {
   document.getElementById("thimMode1").classList.add("active");
   document.getElementById("thimMode2").classList.remove("active");
   appState.th.mode = 1;
-  document.getElementById("thimblesModeBadge").textContent = "x2.80";
+  document.getElementById("thimblesModeBadge").textContent = "x3.80";
 });
 
 document.getElementById("thimMode2")?.addEventListener("click", () => {
@@ -2839,7 +2839,7 @@ document.getElementById("thimMode2")?.addEventListener("click", () => {
   document.getElementById("thimMode2").classList.add("active");
   document.getElementById("thimMode1").classList.remove("active");
   appState.th.mode = 2;
-  document.getElementById("thimblesModeBadge").textContent = "x1.40";
+  document.getElementById("thimblesModeBadge").textContent = "x1.90";
 });
 
 document.querySelectorAll("#view-thimbles .b-chip").forEach(c => {
@@ -2874,17 +2874,26 @@ document.getElementById("thMax")?.addEventListener("click", () => {
   adjustBetInput("thBetInput", "max");
 });
 
+// 4 ta stakan uchun bosish hodisalari
 document.getElementById("cup0")?.addEventListener("click", () => onThimbleClick(0));
 document.getElementById("cup1")?.addEventListener("click", () => onThimbleClick(1));
 document.getElementById("cup2")?.addEventListener("click", () => onThimbleClick(2));
+document.getElementById("cup3")?.addEventListener("click", () => onThimbleClick(3));
 document.getElementById("thStartBtn")?.addEventListener("click", startThimblesGame);
 
 function resetThimblesUI() {
   document.querySelectorAll(".thimble-cup").forEach(c => c.classList.remove("lifted"));
   document.querySelectorAll(".thimble-ball").forEach(b => b.classList.remove("visible"));
+  document.querySelectorAll(".thimble-slot").forEach(s => {
+    s.style.transform = "none";
+    s.style.zIndex = "1";
+  });
   document.getElementById("thimblesMsg").textContent = "Stavka qiling va stakanlardan birini tanlang";
-  document.getElementById("thStartBtn").disabled = false;
-  document.getElementById("thStartBtn").textContent = "STAVKA QILISH";
+  const startBtn = document.getElementById("thStartBtn");
+  if (startBtn) {
+    startBtn.disabled = false;
+    startBtn.textContent = "STAVKA QILISH";
+  }
 }
 
 function startThimblesGame() {
@@ -2897,58 +2906,126 @@ function startThimblesGame() {
 
   appState.th.playing = true;
   appState.th.shuffling = true;
-  document.getElementById("thStartBtn").disabled = true;
-  document.getElementById("thStartBtn").textContent = "ARALASHTIRILMOQDA...";
-
-  const balls = [];
-  if (appState.th.mode === 1) {
-    balls.push(Math.floor(Math.random() * 3));
-  } else {
-    const first = Math.floor(Math.random() * 3);
-    balls.push(first);
-    let second = Math.floor(Math.random() * 3);
-    while (second === first) {
-      second = Math.floor(Math.random() * 3);
-    }
-    balls.push(second);
+  const startBtn = document.getElementById("thStartBtn");
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.textContent = "ARALASHTIRILMOQDA...";
   }
-  appState.th.ballPositions = balls;
 
-  balls.forEach(idx => {
+  // 4 ta stakan uchun to'plarning boshlang'ich o'rni
+  const initialBalls = [];
+  if (appState.th.mode === 1) {
+    initialBalls.push(Math.floor(Math.random() * 4));
+  } else {
+    const first = Math.floor(Math.random() * 4);
+    initialBalls.push(first);
+    let second = Math.floor(Math.random() * 4);
+    while (second === first) {
+      second = Math.floor(Math.random() * 4);
+    }
+    initialBalls.push(second);
+  }
+
+  // Dastlab to'plarni ko'rsatamiz
+  document.querySelectorAll(".thimble-ball").forEach(b => b.classList.remove("visible"));
+  initialBalls.forEach(idx => {
     const ballEl = document.getElementById(`ball${idx}`);
     if (ballEl) ballEl.classList.add("visible");
   });
   document.querySelectorAll(".thimble-cup").forEach(c => c.classList.add("lifted"));
   document.getElementById("thimblesMsg").textContent = "To'plar joylashuvi ko'rsatilmoqda...";
 
+  // Xavfsizlik taymeri: hech qachon qotib qolmasligi uchun
+  const safetyThimTimer = setTimeout(() => {
+    if (appState.th.shuffling) {
+      appState.th.shuffling = false;
+      document.getElementById("thimblesMsg").textContent = "🎯 Stakanlardan birini tanlang!";
+    }
+  }, 4500);
+
   setTimeout(() => {
+    // Stakanlar pastga tushadi
     document.querySelectorAll(".thimble-cup").forEach(c => c.classList.remove("lifted"));
+    document.querySelectorAll(".thimble-ball").forEach(b => b.classList.remove("visible"));
     document.getElementById("thimblesMsg").textContent = "Stakanlar aralashtirilmoqda...";
 
+    // 4 ta stakanning mantiqiy to'p holati (ballMap: har stakanda to'p bormi yo'qmi)
+    const ballMap = [false, false, false, false];
+    initialBalls.forEach(idx => { ballMap[idx] = true; });
+
     let shuffles = 0;
+    const maxShuffles = 6;
+    const cups = [
+      document.getElementById("cup0"),
+      document.getElementById("cup1"),
+      document.getElementById("cup2"),
+      document.getElementById("cup3")
+    ];
+
     const shuffleInterval = setInterval(() => {
       audio.play("shuffle");
       triggerHaptic("light");
-      const cups = [document.getElementById("cup0"), document.getElementById("cup1"), document.getElementById("cup2")];
-      const i1 = Math.floor(Math.random() * 3);
-      const i2 = (i1 + 1 + Math.floor(Math.random() * 2)) % 3;
 
-      cups[i1].style.transform = `translateX(${(i2 - i1) * 90}px)`;
-      cups[i2].style.transform = `translateX(${(i1 - i2) * 90}px)`;
+      // 4 ta stakandan ikkitasini tasodifiy tanlaymiz
+      const i1 = Math.floor(Math.random() * 4);
+      let i2 = Math.floor(Math.random() * 4);
+      while (i2 === i1) {
+        i2 = Math.floor(Math.random() * 4);
+      }
+
+      // Haqiqiy vizual va mantiqiy almashish
+      const stepPx = 70;
+      if (cups[i1] && cups[i2]) {
+        cups[i1].style.zIndex = "5";
+        cups[i2].style.zIndex = "3";
+        cups[i1].style.transform = `translateX(${(i2 - i1) * stepPx}px) translateY(12px)`;
+        cups[i2].style.transform = `translateX(${(i1 - i2) * stepPx}px) translateY(-12px)`;
+      }
+
+      // Mantiqiy to'p joylashuvini almashtiramiz!
+      const tmp = ballMap[i1];
+      ballMap[i1] = ballMap[i2];
+      ballMap[i2] = tmp;
 
       setTimeout(() => {
-        cups[i1].style.transform = "none";
-        cups[i2].style.transform = "none";
-      }, 180);
+        if (cups[i1]) {
+          cups[i1].style.transform = "none";
+          cups[i1].style.zIndex = "1";
+        }
+        if (cups[i2]) {
+          cups[i2].style.transform = "none";
+          cups[i2].style.zIndex = "1";
+        }
+      }, 160);
 
       shuffles++;
-      if (shuffles >= 4) {
+      if (shuffles >= maxShuffles) {
         clearInterval(shuffleInterval);
+        clearTimeout(safetyThimTimer);
+
+        // Yakuniy to'plar ro'yxatini shakllantiramiz
+        let finalBalls = [];
+        for (let i = 0; i < 4; i++) {
+          if (ballMap[i]) finalBalls.push(i);
+        }
+
+        // KAFOLAT: to'p boshlangan joyiga qaytib qolmasligi uchun (har doim boshqa stakanda bo'ladi)
+        const isIdentical = initialBalls.length === finalBalls.length && initialBalls.every(v => finalBalls.includes(v));
+        if (isIdentical) {
+          const ballIdx = finalBalls[0];
+          const emptyIndices = [0, 1, 2, 3].filter(i => !finalBalls.includes(i));
+          if (emptyIndices.length > 0) {
+            const swapTarget = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+            finalBalls = finalBalls.map(x => x === ballIdx ? swapTarget : x);
+          }
+        }
+
+        appState.th.ballPositions = finalBalls;
         appState.th.shuffling = false;
-        document.getElementById("thimblesMsg").textContent = "🎯 Stakanlardan birini tanlang!";
+        document.getElementById("thimblesMsg").textContent = "🎯 Qaysi stakanda to'p bor? Biringizni tanlang!";
       }
-    }, 280);
-  }, 700);
+    }, 250);
+  }, 750);
 }
 
 async function onThimbleClick(cupIndex) {
@@ -2959,15 +3036,18 @@ async function onThimbleClick(cupIndex) {
   const thTrapChance = appState.evilMode ? 0.85 : 0.0;
   if (Math.random() < thTrapChance) {
     if (appState.th.ballPositions.includes(cupIndex)) {
-      const otherCups = [0, 1, 2].filter(c => c !== cupIndex);
+      const otherCups = [0, 1, 2, 3].filter(c => c !== cupIndex);
       if (appState.th.mode === 1) {
         appState.th.ballPositions = [otherCups[Math.floor(Math.random() * otherCups.length)]];
       } else {
-        appState.th.ballPositions = otherCups;
+        const o1 = otherCups[0];
+        const o2 = otherCups[1];
+        appState.th.ballPositions = [o1, o2];
       }
     }
   }
 
+  // Barcha 4 ta stakanni ko'taramiz va to'plarni ko'rsatamiz
   document.querySelectorAll(".thimble-cup").forEach(c => c.classList.add("lifted"));
   appState.th.ballPositions.forEach(idx => {
     const b = document.getElementById(`ball${idx}`);
@@ -2975,7 +3055,8 @@ async function onThimbleClick(cupIndex) {
   });
 
   const isWin = appState.th.ballPositions.includes(cupIndex);
-  const mult = appState.th.mode === 1 ? 2.80 : 1.40;
+  // 4 ta stakanda: 1 ta to'p = x3.80, 2 ta to'p = x1.90
+  const mult = appState.th.mode === 1 ? 3.80 : 1.90;
 
   if (isWin) {
     const winSum = Math.floor(appState.th.bet * mult);
@@ -2984,35 +3065,39 @@ async function onThimbleClick(cupIndex) {
     fx.confetti();
     updateBalanceUI(appState.balance + winSum);
 
-    const res = await apiFetch("/api/game-result", "POST", {
+    apiFetch("/api/game-result", "POST", {
       user_id: USER_ID,
       game_name: "thimbles",
       bet: appState.th.bet,
       win: winSum,
       multiplier: mult
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
-    showToast(`🎉 +${formatMoney(winSum)} UZS! To'g'ri topdingiz!`, true);
+    }).then(res => {
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }).catch(() => {});
+
+    showToast(`🎉 +${formatMoney(winSum)} UZS! To'g'ri topdingiz (x${mult.toFixed(2)})!`, true);
     document.getElementById("thimblesMsg").textContent = `🎉 YUTUQ: +${formatMoney(winSum)} UZS!`;
   } else {
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
 
-    const res = await apiFetch("/api/game-result", "POST", {
+    apiFetch("/api/game-result", "POST", {
       user_id: USER_ID,
       game_name: "thimbles",
       bet: appState.th.bet,
       win: 0,
       multiplier: 0
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
+    }).then(res => {
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    }).catch(() => {});
+
     showToast(`💥 Yutqazdingiz! -${formatMoney(appState.th.bet)} UZS`, false);
     document.getElementById("thimblesMsg").textContent = "💥 Afsuski bu stakanda to'p yo'q edi!";
   }
