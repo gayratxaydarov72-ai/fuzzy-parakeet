@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.8">
+  <link rel="stylesheet" href="style.css?v=4.9">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -824,21 +824,21 @@
         <!-- Wheel Canvas & Result Banner -->
         <div class="rl-wheel-box">
           <div class="rl-pointer">
-            <svg viewBox="0 0 24 32" style="width:26px;height:34px;">
-              <polygon points="12,32 2,4 22,4" fill="#ffd700" stroke="#b8860b" stroke-width="1.8"/>
-              <circle cx="12" cy="8" r="4" fill="#ffffff"/>
+            <svg viewBox="0 0 20 28" style="width:20px;height:28px;">
+              <polygon points="10,28 2,4 18,4" fill="#ffd700" stroke="#b8860b" stroke-width="1.5"/>
+              <circle cx="10" cy="7" r="3.5" fill="#ffffff"/>
             </svg>
           </div>
-          <canvas id="rouletteCanvas" width="280" height="280"></canvas>
+          <canvas id="rouletteCanvas" width="200" height="200"></canvas>
           <div class="rl-winning-overlay" id="rlWinningOverlay" style="display:none;">
             <div class="rl-win-num-badge" id="rlWinNumBadge">7</div>
             <div class="rl-win-label" id="rlWinLabel">QIZIL</div>
           </div>
         </div>
 
-        <!-- Main Betting Board & Stake Controller -->
+        <!-- Main Betting Board -->
         <div class="rl-board-wrap">
-          <div class="rl-board-title">1. STAVKA TURINI TANLANG:</div>
+          <div class="rl-board-title">STAVKA TURINI TANLANG:</div>
           <!-- Big 3: Red, Green (Zero), Black -->
           <div class="rl-main-choices">
             <button class="rl-choice-card rl-choice-red active" data-choice="red" data-label="🔴 QIZIL (x2.0)">
@@ -876,40 +876,6 @@
               <!-- Dynamically populated 0-36 buttons -->
             </div>
           </details>
-
-          <!-- STAKE AMOUNT & CHIPS & ACTION BUTTON (DIRECTLY VISIBLE) -->
-          <div class="rl-bet-controller">
-            <div class="rl-ctrl-header">
-              <span class="rl-ctrl-title">2. STAVKA MIQDORI VA TIKISH:</span>
-              <span class="rl-current-pick" id="rlSelectedLabel">🔴 QIZIL (x2.00)</span>
-            </div>
-
-            <div class="bet-row rl-bet-row">
-              <div class="b-input-wrap rl-input-wrap">
-                <button class="btn-b-step" id="rlMinus">-</button>
-                <input type="number" id="rlBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-                <span class="b-curr">UZS</span>
-                <button class="btn-b-step" id="rlPlus">+</button>
-              </div>
-              <button class="btn-b-mod" id="rlHalf">/2</button>
-              <button class="btn-b-mod" id="rlDouble">x2</button>
-              <button class="btn-b-mod" id="rlMax">MAX</button>
-            </div>
-
-            <div class="chips-row rl-chips-row">
-              <button class="b-chip" data-v="1000">1K</button>
-              <button class="b-chip" data-v="5000">5K</button>
-              <button class="b-chip" data-v="10000">10K</button>
-              <button class="b-chip" data-v="25000">25K</button>
-              <button class="b-chip" data-v="50000">50K</button>
-              <button class="b-chip" data-v="100000">100K</button>
-            </div>
-
-            <!-- Big 1xBet Style Action Button -->
-            <button class="btn-crash-action btn-ready rl-action-main-btn" id="rlActionBtn">
-              STAVKA QILISH (ONLINE)
-            </button>
-          </div>
         </div>
 
         <!-- 1xBet Style Real-Time Online Players Table -->
@@ -936,10 +902,44 @@
             <div class="rl-empty-state">
               <div class="rl-empty-ico">🎰</div>
               <div class="rl-empty-title">Ushbu raundda hali hech kim stavka qilmadi</div>
-              <div class="rl-empty-sub">Yuqoridagi tugma orqali birinchi bo'lib stavka qiling!</div>
+              <div class="rl-empty-sub">Pastdagi tugma orqali birinchi bo'lib stavka qiling!</div>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Docked / Fixed Bottom Betting Controller (Always in sight!) -->
+      <div class="arena-footer rl-arena-footer">
+        <div class="rl-footer-pick-row">
+          <span class="rl-fp-lbl">TANLANGAN STAVKA:</span>
+          <span class="rl-fp-val" id="rlSelectedLabel">🔴 QIZIL (x2.00)</span>
+        </div>
+
+        <div class="bet-row rl-bet-row">
+          <div class="b-input-wrap rl-input-wrap">
+            <button class="btn-b-step" id="rlMinus">-</button>
+            <input type="number" id="rlBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+            <span class="b-curr">UZS</span>
+            <button class="btn-b-step" id="rlPlus">+</button>
+          </div>
+          <button class="btn-b-mod" id="rlHalf">/2</button>
+          <button class="btn-b-mod" id="rlDouble">x2</button>
+          <button class="btn-b-mod" id="rlMax">MAX</button>
+        </div>
+
+        <div class="chips-row rl-chips-row">
+          <button class="b-chip" data-v="1000">1K</button>
+          <button class="b-chip" data-v="5000">5K</button>
+          <button class="b-chip" data-v="10000">10K</button>
+          <button class="b-chip" data-v="25000">25K</button>
+          <button class="b-chip" data-v="50000">50K</button>
+          <button class="b-chip" data-v="100000">100K</button>
+        </div>
+
+        <!-- Big 1xBet Style Action Button -->
+        <button class="btn-crash-action btn-ready rl-action-main-btn" id="rlActionBtn">
+          STAVKA QILISH (🔴 QIZIL (x2.0))
+        </button>
       </div>
     </div>
 
@@ -1068,6 +1068,6 @@
 
   </div>
 
-  <script src="game.js?v=4.8"></script>
+  <script src="game.js?v=4.9"></script>
 </body>
 </html>

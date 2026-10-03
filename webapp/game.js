@@ -4362,12 +4362,12 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
   const cy = h / 2;
-  const outerR = Math.min(w, h) / 2 - 4;
-  const rimWidth = 12;
+  const outerR = Math.min(w, h) / 2 - 3;
+  const rimWidth = Math.max(7, outerR * 0.09);
   const trackR = outerR - rimWidth;
-  const pocketOuterR = trackR - 10;
-  const pocketInnerR = pocketOuterR - 30;
-  const coneR = pocketInnerR - 4;
+  const pocketOuterR = trackR - Math.max(5, outerR * 0.07);
+  const pocketInnerR = pocketOuterR - Math.max(18, outerR * 0.23);
+  const coneR = pocketInnerR - 3;
 
   ctx.save();
 
@@ -4380,7 +4380,7 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
   ctx.fillStyle = rimGrad;
   ctx.fill();
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = Math.max(1.5, outerR * 0.02);
   ctx.strokeStyle = "#ffd700";
   ctx.stroke();
 
@@ -4393,13 +4393,15 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.arc(cx, cy, trackR, 0, Math.PI * 2);
   ctx.fillStyle = trackGrad;
   ctx.fill();
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1;
   ctx.strokeStyle = "rgba(255, 215, 0, 0.45)";
   ctx.stroke();
 
   // 3. 37 Pockets Ring
   const dTheta = (Math.PI * 2) / 37;
   const wheelAngle = appState.rl.wheelAngle || 0;
+  const numR = (pocketOuterR + pocketInnerR) / 2;
+  const fontSize = Math.max(6.8, outerR * 0.075);
 
   for (let i = 0; i < 37; i++) {
     const num = ROULETTE_NUMBERS[i];
@@ -4418,7 +4420,7 @@ function drawRouletteWheel(ctx, w, h) {
     ctx.closePath();
     ctx.fillStyle = fill;
     ctx.fill();
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = 0.7;
     ctx.strokeStyle = "#ffd700";
     ctx.stroke();
 
@@ -4429,21 +4431,21 @@ function drawRouletteWheel(ctx, w, h) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 8.5px Oswald, Roboto, sans-serif";
-    ctx.fillText(num, (pocketOuterR + pocketInnerR) / 2, 0);
+    ctx.font = `bold ${fontSize.toFixed(1)}px Oswald, Roboto, sans-serif`;
+    ctx.fillText(num, numR, 0);
     ctx.restore();
   }
 
   // Pocket boundary separator rings
   ctx.beginPath();
   ctx.arc(cx, cy, pocketOuterR, 0, Math.PI * 2);
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.2;
   ctx.strokeStyle = "#ffd700";
   ctx.stroke();
 
   ctx.beginPath();
   ctx.arc(cx, cy, pocketInnerR, 0, Math.PI * 2);
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.4;
   ctx.strokeStyle = "#ffd700";
   ctx.stroke();
 
@@ -4457,7 +4459,7 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.arc(cx, cy, coneR, 0, Math.PI * 2);
   ctx.fillStyle = coneGrad;
   ctx.fill();
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.4;
   ctx.strokeStyle = "#ffeaa7";
   ctx.stroke();
 
@@ -4465,48 +4467,50 @@ function drawRouletteWheel(ctx, w, h) {
     const spA = wheelAngle * 1.5 + (s * Math.PI / 4);
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(spA) * (coneR - 4), cy + Math.sin(spA) * (coneR - 4));
-    ctx.lineWidth = 1.8;
+    ctx.lineTo(cx + Math.cos(spA) * (coneR - 3), cy + Math.sin(spA) * (coneR - 3));
+    ctx.lineWidth = 1.4;
     ctx.strokeStyle = "rgba(77, 50, 2, 0.65)";
     ctx.stroke();
   }
 
   // Center Brass Dome Cap
-  const capGrad = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 16);
+  const capR = Math.max(10, coneR * 0.25);
+  const capGrad = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, capR);
   capGrad.addColorStop(0, "#ffffff");
   capGrad.addColorStop(0.3, "#fff275");
   capGrad.addColorStop(0.8, "#d4a017");
   capGrad.addColorStop(1, "#543802");
   ctx.beginPath();
-  ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+  ctx.arc(cx, cy, capR, 0, Math.PI * 2);
   ctx.fillStyle = capGrad;
   ctx.fill();
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1;
   ctx.strokeStyle = "#ffffff";
   ctx.stroke();
 
   // 5. Golden Pearl Ball
-  const ballR = appState.rl.ballRadius || (trackR - 4);
+  const ballDotR = Math.max(3.8, outerR * 0.04);
+  const ballR = appState.rl.ballRadius || (trackR - ballDotR);
   const ballA = appState.rl.ballAngle || -Math.PI / 2;
   const bx = cx + Math.cos(ballA) * ballR;
   const by = cy + Math.sin(ballA) * ballR;
 
   // Ball shadow
   ctx.beginPath();
-  ctx.arc(bx + 2, by + 2, 5.5, 0, Math.PI * 2);
+  ctx.arc(bx + 1.5, by + 1.5, ballDotR, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
   ctx.fill();
 
   // Ball sphere
-  const ballGrad = ctx.createRadialGradient(bx - 2, by - 2, 1, bx, by, 5.5);
+  const ballGrad = ctx.createRadialGradient(bx - 1.5, by - 1.5, 1, bx, by, ballDotR);
   ballGrad.addColorStop(0, "#ffffff");
   ballGrad.addColorStop(0.65, "#ecf0f1");
   ballGrad.addColorStop(1, "#95a5a6");
   ctx.beginPath();
-  ctx.arc(bx, by, 5.5, 0, Math.PI * 2);
+  ctx.arc(bx, by, ballDotR, 0, Math.PI * 2);
   ctx.fillStyle = ballGrad;
   ctx.fill();
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 0.8;
   ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
   ctx.stroke();
 
@@ -4526,10 +4530,11 @@ function rouletteLoop(timestamp) {
 
   const w = rouletteCanvas.width;
   const h = rouletteCanvas.height;
-  const outerR = Math.min(w, h) / 2 - 4;
-  const trackR = outerR - 12;
-  const pocketOuterR = trackR - 10;
-  const pocketInnerR = pocketOuterR - 30;
+  const outerR = Math.min(w, h) / 2 - 3;
+  const rimWidth = Math.max(7, outerR * 0.09);
+  const trackR = outerR - rimWidth;
+  const pocketOuterR = trackR - Math.max(5, outerR * 0.07);
+  const pocketInnerR = pocketOuterR - Math.max(18, outerR * 0.23);
   const pocketR = (pocketOuterR + pocketInnerR) / 2;
 
   if (appState.rl.phase === "spinning") {
