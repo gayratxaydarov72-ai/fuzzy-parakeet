@@ -117,6 +117,8 @@ def init_db():
             try:
                 cur.execute("ALTER TABLE promocodes ALTER COLUMN amount TYPE BIGINT;")
                 cur.execute("ALTER TABLE users ALTER COLUMN balance TYPE BIGINT;")
+                cur.execute("ALTER TABLE game_history ALTER COLUMN bet TYPE BIGINT;")
+                cur.execute("ALTER TABLE game_history ALTER COLUMN win TYPE BIGINT;")
             except Exception:
                 pass
         cur.execute("""
@@ -157,8 +159,8 @@ def init_db():
             id SERIAL PRIMARY KEY,
             user_id BIGINT,
             game_name TEXT,
-            bet INTEGER,
-            win INTEGER,
+            bet BIGINT,
+            win BIGINT,
             multiplier REAL,
             provably_hash TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

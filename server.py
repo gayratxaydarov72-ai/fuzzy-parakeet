@@ -881,15 +881,16 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/game-result":
             game_name = str(data.get("game_name") or data.get("game") or "kamikaze")[:32]
-            bet = max(0, min(10_000_000, safe_int(data.get("bet"), 0)))
-            mult = max(0.0, min(10_000.0, safe_float(data.get("multiplier"), 0.0)))
-            raw_win = safe_int(data.get("win") if data.get("win") is not None else data.get("payout"), 0)
+            bet = max(0, min(1_000_000_000_000, safe_int(data.get("bet"), 0)))
+            mult = max(0.0, min(1_000_000.0, safe_float(data.get("multiplier"), 0.0)))
+            raw_win = max(0, min(1_000_000_000_000, safe_int(data.get("win") if data.get("win") is not None else data.get("payout"), 0)))
             if mult <= 0.0 and bet > 0 and raw_win > 0:
-                mult = round(raw_win / bet, 2)
+                mult = round(raw_win / bet, 4)
 
-            # Anti-Cheat: calculate expected max payout
+            # Anti-Cheat: calculate expected max payout with generous float precision buffer
             if bet > 0:
-                max_allowed_win = int(bet * max(mult, 1.0) + 50)
+                eff_mult = max(mult, (raw_win / bet) if bet > 0 else 1.0)
+                max_allowed_win = int(bet * max(eff_mult, 1.0) + 5000)
                 win = max(0, min(max_allowed_win, raw_win))
             else:
                 win = 0
@@ -915,7 +916,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             choice = str(data.get("choice") or "heads").lower()
             if choice not in ("heads", "tails"):
                 return self.send_json({"ok": False, "error": "Noto'g'ri tanlov! (heads yoki tails)"}, status=400)
-            bet = max(1000, min(10_000_000, safe_int(data.get("bet"), 1000)))
+            bet = max(1000, min(1_000_000_000_000, safe_int(data.get("bet"), 1000)))
             name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
             uname = str(data.get("username") or "")[:40]
             ok, res_bal_or_err = coinflip_room.place_bet(uid, name, uname, choice, bet)
@@ -925,7 +926,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
 
         elif path == "/api/aviator/bet":
-            bet = max(1000, min(10_000_000, safe_int(data.get("bet"), 1000)))
+            bet = max(1000, min(1_000_000_000_000, safe_int(data.get("bet"), 1000)))
             name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
             uname = str(data.get("username") or "")[:40]
             ok, res_or_err = aviator_room.place_bet(uid, bet, name, uname)
@@ -951,7 +952,7 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/roulette/bet":
             choice = str(data.get("choice") or "red").lower().strip()
             choice_label = str(data.get("choice_label") or choice)[:50]
-            bet = max(1000, min(10_000_000, safe_int(data.get("bet"), 1000)))
+            bet = max(1000, min(1_000_000_000_000, safe_int(data.get("bet"), 1000)))
             name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
             uname = str(data.get("username") or "")[:40]
             ok, res_bal_or_err = roulette_room.place_bet(uid, name, uname, choice, choice_label, bet)

@@ -951,7 +951,8 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 
 function getValidatedBet(inputElId) {
   const el = document.getElementById(inputElId);
-  const val = parseInt(el?.value, 10);
+  const rawStr = String(el?.value || "").replace(/\s+/g, "").replace(/,/g, "").replace(/_/g, "");
+  const val = parseInt(rawStr, 10);
   if (isNaN(val) || val < 1000) {
     showToast("⚠️ Minimal stavka: 1 000 UZS!", false);
     triggerHaptic("error");
@@ -979,15 +980,17 @@ function adjustBetInput(inputId, action) {
   if (!el) return;
   audio.play("click");
   triggerHaptic("light");
-  let v = parseInt(el.value, 10) || 5000;
+  const rawStr = String(el.value || "").replace(/\s+/g, "").replace(/,/g, "").replace(/_/g, "");
+  let v = parseInt(rawStr, 10) || 5000;
+  const maxLimit = Math.max(appState.balance || 0, 1_000_000_000_000);
   if (action === "minus") {
     el.value = Math.max(1000, v - 1000);
   } else if (action === "plus") {
-    el.value = Math.min(1000000, v + 1000);
+    el.value = Math.min(maxLimit, v + 1000);
   } else if (action === "half") {
     el.value = Math.max(1000, Math.floor(v / 2));
   } else if (action === "double") {
-    el.value = Math.min(1000000, v * 2);
+    el.value = Math.min(maxLimit, v * 2);
   } else if (action === "max") {
     el.value = Math.max(1000, appState.balance > 0 ? appState.balance : 50000);
   }
