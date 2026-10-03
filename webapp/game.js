@@ -85,6 +85,7 @@ const appState = {
     row: 0,
     bet: 5000,
     playing: false,
+    busy: false,
     grid: []
   },
 
@@ -92,6 +93,7 @@ const appState = {
     row: 0,
     bet: 5000,
     playing: false,
+    busy: false,
     grid: []
   },
 
@@ -102,9 +104,9 @@ const appState = {
     multiplier: 1.00,
     crashPoint: 1.00,
     startTime: 0,
-    countdownDuration: 5.0,
+    countdownDuration: 2.0,
     countdownStart: 0,
-    lastTickSec: 5,
+    lastTickSec: 2,
     userCashedOut: false,
     userWonSum: 0,
     userWonMult: 0,
@@ -123,6 +125,7 @@ const appState = {
     mines: 3,
     bet: 5000,
     playing: false,
+    busy: false,
     grid: [],
     revealed: [],
     openedCount: 0,
@@ -178,23 +181,30 @@ class AudioEngine {
   }
 
   init() {
-    if (!this.ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AC();
-    }
-    if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume();
-    }
+    try {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) this.ctx = new AC();
+      }
+      if (this.ctx && this.ctx.state === "suspended") {
+        this.ctx.resume().catch(() => {});
+      }
+    } catch (e) {}
   }
 
   startBgm() {
     if (this.bgmPlaying) return;
     this.init();
+    if (!this.ctx) return;
     this.bgmPlaying = true;
     this.bgmStep = 0;
-    this.bgmMaster = this.ctx.createGain();
-    this.bgmMaster.gain.setValueAtTime(0.08, this.ctx.currentTime);
-    this.bgmMaster.connect(this.ctx.destination);
+    try {
+      this.bgmMaster = this.ctx.createGain();
+      this.bgmMaster.gain.setValueAtTime(0.08, this.ctx.currentTime);
+      this.bgmMaster.connect(this.ctx.destination);
+    } catch (e) {
+      return;
+    }
 
     const chords = [
       [220.00, 261.63, 329.63, 392.00, 440.00, 523.25],
@@ -206,47 +216,49 @@ class AudioEngine {
 
     const playPulse = () => {
       if (!this.bgmPlaying || !this.ctx) return;
-      const t = this.ctx.currentTime;
-      const chordIdx = Math.floor(this.bgmStep / 8) % chords.length;
-      const noteIdx = this.bgmStep % chords[chordIdx].length;
-      const f = chords[chordIdx][noteIdx];
+      try {
+        const t = this.ctx.currentTime;
+        const chordIdx = Math.floor(this.bgmStep / 8) % chords.length;
+        const noteIdx = this.bgmStep % chords[chordIdx].length;
+        const f = chords[chordIdx][noteIdx];
 
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(f, t);
-      gain.gain.setValueAtTime(0.045, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-      osc.connect(gain);
-      gain.connect(this.bgmMaster);
-      osc.start(t);
-      osc.stop(t + 0.23);
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.045, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(gain);
+        gain.connect(this.bgmMaster);
+        osc.start(t);
+        osc.stop(t + 0.23);
 
-      if (this.bgmStep % 8 === 0) {
-        const bOsc = this.ctx.createOscillator();
-        const bGain = this.ctx.createGain();
-        bOsc.type = "triangle";
-        bOsc.frequency.setValueAtTime(bass[chordIdx], t);
-        bGain.gain.setValueAtTime(0.09, t);
-        bGain.gain.exponentialRampToValueAtTime(0.002, t + 1.2);
-        bOsc.connect(bGain);
-        bGain.connect(this.bgmMaster);
-        bOsc.start(t);
-        bOsc.stop(t + 1.2);
-      }
+        if (this.bgmStep % 8 === 0) {
+          const bOsc = this.ctx.createOscillator();
+          const bGain = this.ctx.createGain();
+          bOsc.type = "triangle";
+          bOsc.frequency.setValueAtTime(bass[chordIdx], t);
+          bGain.gain.setValueAtTime(0.09, t);
+          bGain.gain.exponentialRampToValueAtTime(0.002, t + 1.2);
+          bOsc.connect(bGain);
+          bGain.connect(this.bgmMaster);
+          bOsc.start(t);
+          bOsc.stop(t + 1.2);
+        }
 
-      if (this.bgmStep % 2 === 0) {
-        const nOsc = this.ctx.createOscillator();
-        const nGain = this.ctx.createGain();
-        nOsc.type = "sine";
-        nOsc.frequency.setValueAtTime(1400, t);
-        nGain.gain.setValueAtTime(0.007, t);
-        nGain.gain.exponentialRampToValueAtTime(0.0005, t + 0.04);
-        nOsc.connect(nGain);
-        nGain.connect(this.bgmMaster);
-        nOsc.start(t);
-        nOsc.stop(t + 0.04);
-      }
+        if (this.bgmStep % 2 === 0) {
+          const nOsc = this.ctx.createOscillator();
+          const nGain = this.ctx.createGain();
+          nOsc.type = "sine";
+          nOsc.frequency.setValueAtTime(1400, t);
+          nGain.gain.setValueAtTime(0.007, t);
+          nGain.gain.exponentialRampToValueAtTime(0.0005, t + 0.04);
+          nOsc.connect(nGain);
+          nGain.connect(this.bgmMaster);
+          nOsc.start(t);
+          nOsc.stop(t + 0.04);
+        }
+      } catch (e) {}
 
       this.bgmStep++;
       this.bgmTimer = setTimeout(playPulse, 180);
@@ -277,146 +289,149 @@ class AudioEngine {
 
   play(type, freqParam = 0) {
     if (!appState.sound) return;
-    this.init();
+    try {
+      this.init();
+      if (!this.ctx) return;
 
-    if (type === "click") {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.04);
-      gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.04);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.04);
-    } else if (type === "step") {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const f = 450 + freqParam * 45;
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(f, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(f * 1.4, this.ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.12);
-    } else if (type === "boom") {
-      const size = this.ctx.sampleRate * 0.4;
-      const buf = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < size; i++) d[i] = Math.random() * 2 - 1;
-      const src = this.ctx.createBufferSource();
-      src.buffer = buf;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(800, this.ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.35);
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-      src.start();
-      src.stop(this.ctx.currentTime + 0.4);
-    } else if (type === "win") {
-      [523.25, 659.25, 783.99, 1046.50].forEach((f, idx) => {
+      if (type === "click") {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.frequency.setValueAtTime(f, this.ctx.currentTime + idx * 0.06);
-        gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.06);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.06 + 0.18);
+        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.04);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-        osc.start(this.ctx.currentTime + idx * 0.06);
-        osc.stop(this.ctx.currentTime + idx * 0.06 + 0.18);
-      });
-    } else if (type === "takeoff") {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(140, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(450, this.ctx.currentTime + 0.5);
-      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.5);
-    } else if (type === "tick") {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-      gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.05);
-    } else if (type === "gem") {
-      const osc = this.ctx.createOscillator();
-      const osc2 = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sine";
-      osc2.type = "triangle";
-      const baseF = 880 + freqParam * 35;
-      osc.frequency.setValueAtTime(baseF, this.ctx.currentTime);
-      osc2.frequency.setValueAtTime(baseF * 1.5, this.ctx.currentTime);
-      gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
-      osc.connect(gain);
-      osc2.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc2.start();
-      osc.stop(this.ctx.currentTime + 0.28);
-      osc2.stop(this.ctx.currentTime + 0.28);
-    } else if (type === "dice") {
-      for (let i = 0; i < 4; i++) {
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.04);
+      } else if (type === "step") {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        const t = this.ctx.currentTime + i * 0.07;
-        osc.frequency.setValueAtTime(280 + Math.random() * 200, t);
-        gain.gain.setValueAtTime(0.15, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+        const f = 450 + freqParam * 45;
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(f, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(f * 1.4, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.05);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      } else if (type === "boom") {
+        const size = Math.floor(Math.min(24000, this.ctx.sampleRate * 0.25));
+        const buf = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < size; i++) d[i] = Math.random() * 2 - 1;
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.25);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        src.start();
+        src.stop(this.ctx.currentTime + 0.3);
+      } else if (type === "win") {
+        [523.25, 659.25, 783.99, 1046.50].forEach((f, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.frequency.setValueAtTime(f, this.ctx.currentTime + idx * 0.06);
+          gain.gain.setValueAtTime(0.18, this.ctx.currentTime + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.06 + 0.18);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.06);
+          osc.stop(this.ctx.currentTime + idx * 0.06 + 0.18);
+        });
+      } else if (type === "takeoff") {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(450, this.ctx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.5);
+      } else if (type === "tick") {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.05);
+      } else if (type === "gem") {
+        const osc = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc2.type = "triangle";
+        const baseF = 880 + freqParam * 35;
+        osc.frequency.setValueAtTime(baseF, this.ctx.currentTime);
+        osc2.frequency.setValueAtTime(baseF * 1.5, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
+        osc.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc2.start();
+        osc.stop(this.ctx.currentTime + 0.28);
+        osc2.stop(this.ctx.currentTime + 0.28);
+      } else if (type === "dice") {
+        for (let i = 0; i < 4; i++) {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const t = this.ctx.currentTime + i * 0.07;
+          osc.frequency.setValueAtTime(280 + Math.random() * 200, t);
+          gain.gain.setValueAtTime(0.15, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.05);
+        }
+      } else if (type === "shuffle") {
+        const size = Math.floor(Math.min(24000, this.ctx.sampleRate * 0.15));
+        const buf = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < size; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / size);
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(600, this.ctx.currentTime);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        src.start();
+      } else if (type === "coin") {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1600, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.35);
       }
-    } else if (type === "shuffle") {
-      const size = Math.floor(this.ctx.sampleRate * 0.15);
-      const buf = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < size; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / size);
-      const src = this.ctx.createBufferSource();
-      src.buffer = buf;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.setValueAtTime(600, this.ctx.currentTime);
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-      src.start();
-    } else if (type === "coin") {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1600, this.ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.35);
-    }
+    } catch (e) {}
   }
 }
 
@@ -436,79 +451,117 @@ function triggerHaptic(type) {
 class ParticleFX {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.ctx = canvas ? canvas.getContext("2d") : null;
     this.list = [];
+    this.running = false;
     this.resize();
     window.addEventListener("resize", () => this.resize());
-    this.loop();
   }
 
   resize() {
-    if (this.canvas && this.canvas.parentElement) {
-      this.canvas.width = this.canvas.parentElement.clientWidth;
-      this.canvas.height = this.canvas.parentElement.clientHeight;
-    }
+    try {
+      if (this.canvas && this.canvas.parentElement) {
+        const w = this.canvas.parentElement.clientWidth;
+        const h = this.canvas.parentElement.clientHeight;
+        if (w > 0 && h > 0) {
+          this.canvas.width = w;
+          this.canvas.height = h;
+        }
+      }
+    } catch (e) {}
   }
 
   explode(x, y) {
-    for (let i = 0; i < 35; i++) {
+    if (!this.ctx || !this.canvas) return;
+    const cw = this.canvas.width || 360;
+    const ch = this.canvas.height || 640;
+    const px = typeof x === "number" && !isNaN(x) ? x : cw / 2;
+    const py = typeof y === "number" && !isNaN(y) ? y : ch / 2;
+
+    for (let i = 0; i < 26; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const spd = Math.random() * 6 + 2;
+      const spd = Math.random() * 5 + 2;
       this.list.push({
-        x, y,
+        x: px,
+        y: py,
         vx: Math.cos(angle) * spd,
         vy: Math.sin(angle) * spd,
-        color: ["#e74c3c", "#f39c12", "#f1c40f", "#fff"][Math.floor(Math.random() * 4)],
-        size: Math.random() * 4 + 2,
+        color: ["#e74c3c", "#f39c12", "#f1c40f", "#ffffff"][Math.floor(Math.random() * 4)],
+        size: Math.max(1, Math.random() * 3.5 + 1.5),
         alpha: 1,
-        decay: Math.random() * 0.03 + 0.02
+        decay: Math.random() * 0.035 + 0.025
       });
     }
+    this.startLoop();
   }
 
   confetti() {
-    for (let i = 0; i < 45; i++) {
+    if (!this.ctx || !this.canvas) return;
+    const w = this.canvas.width || window.innerWidth || 360;
+    const h = this.canvas.height || window.innerHeight || 640;
+    for (let i = 0; i < 35; i++) {
       this.list.push({
-        x: Math.random() * this.canvas.width,
-        y: this.canvas.height + 10,
-        vx: (Math.random() - 0.5) * 5,
-        vy: -(Math.random() * 10 + 6),
-        color: ["#2ecc71", "#3498db", "#f1c40f", "#9b59b6"][Math.floor(Math.random() * 4)],
-        size: Math.random() * 5 + 3,
+        x: Math.random() * w,
+        y: h + 10,
+        vx: (Math.random() - 0.5) * 4.5,
+        vy: -(Math.random() * 9 + 5),
+        color: ["#2ecc71", "#3498db", "#f1c40f", "#9b59b6", "#e74c3c"][Math.floor(Math.random() * 5)],
+        size: Math.max(1.5, Math.random() * 4 + 2),
         alpha: 1,
-        gravity: 0.2,
-        decay: 0.012
+        gravity: 0.22,
+        decay: 0.015
       });
+    }
+    this.startLoop();
+  }
+
+  startLoop() {
+    if (!this.running) {
+      this.running = true;
+      requestAnimationFrame(() => this.loop());
     }
   }
 
   loop() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    for (let i = this.list.length - 1; i >= 0; i--) {
-      const p = this.list[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      if (p.gravity) p.vy += p.gravity;
-      p.alpha -= p.decay;
-
-      if (p.alpha <= 0) {
-        this.list.splice(i, 1);
-        continue;
-      }
-
-      this.ctx.save();
-      this.ctx.globalAlpha = p.alpha;
-      this.ctx.fillStyle = p.color;
-      this.ctx.beginPath();
-      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.restore();
+    if (!this.ctx || !this.canvas) {
+      this.running = false;
+      return;
     }
-    requestAnimationFrame(() => this.loop());
+    try {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      for (let i = this.list.length - 1; i >= 0; i--) {
+        const p = this.list[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.gravity) p.vy += p.gravity;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          this.list.splice(i, 1);
+          continue;
+        }
+
+        this.ctx.save();
+        this.ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+        this.ctx.fillStyle = p.color;
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, Math.max(0.5, p.size), 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+      }
+    } catch (e) {}
+
+    if (this.list.length > 0) {
+      requestAnimationFrame(() => this.loop());
+    } else {
+      this.running = false;
+    }
   }
 }
 
 const fx = new ParticleFX(document.getElementById("fx-canvas"));
+const particleFx = fx;
+window.particleFx = fx;
 
 function formatMoney(n) {
   if (typeof n !== "number" || isNaN(n)) return "0";
@@ -1090,7 +1143,11 @@ function updateKamikazeActiveRows() {
       r.classList.add("passed");
     } else if (idx === appState.km.row) {
       r.classList.add("active");
-      r.scrollIntoView({ behavior: "smooth", block: "center" });
+      const scrollParent = r.closest(".board-scroll-wrap");
+      if (scrollParent) {
+        const targetTop = r.offsetTop - scrollParent.clientHeight / 2 + r.clientHeight / 2;
+        scrollParent.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      }
     } else {
       r.classList.add("disabled");
     }
@@ -1099,6 +1156,7 @@ function updateKamikazeActiveRows() {
 
 let kmResetTimer = null;
 function startKamikazeGame() {
+  if (appState.km.playing || appState.km.busy) return;
   clearTimeout(kmResetTimer);
   const betVal = getValidatedBet("kmBetInput");
   if (!betVal) return;
@@ -1106,6 +1164,7 @@ function startKamikazeGame() {
   appState.km.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
 
+  appState.km.busy = false;
   appState.km.playing = true;
   appState.km.row = 0;
 
@@ -1126,20 +1185,25 @@ function startKamikazeGame() {
   renderKamikazeBoard();
   updateKamikazeActiveRows();
 
-  document.getElementById("kmBettingBox").style.display = "none";
-  document.getElementById("kmCashoutBox").style.display = "block";
-  document.getElementById("kmCashoutBtn").disabled = true;
-  document.getElementById("kmCashoutSum").textContent = "1-qatordan tanlang";
+  const betBox = document.getElementById("kmBettingBox");
+  if (betBox) betBox.style.display = "none";
+  const cashBox = document.getElementById("kmCashoutBox");
+  if (cashBox) cashBox.style.display = "block";
+  const cashBtn = document.getElementById("kmCashoutBtn");
+  if (cashBtn) cashBtn.disabled = true;
+  const cashSum = document.getElementById("kmCashoutSum");
+  if (cashSum) cashSum.textContent = "1-qatordan tanlang";
 
   triggerHaptic("medium");
 }
 
 function onKamikazeClick(r, c, ev) {
-  if (!appState.km.playing || r !== appState.km.row) return;
+  if (!appState.km.playing || appState.km.busy || r !== appState.km.row) return;
+  appState.km.busy = true;
 
   // Smart house edge (fair in normal mode, 85% in evil mode)
   const kmTrapChance = appState.evilMode ? 0.85 : 0.0;
-  if (Math.random() < kmTrapChance) {
+  if (Math.random() < kmTrapChance && appState.km.grid && appState.km.grid[r]) {
     if (!appState.km.grid[r][c]) {
       const bombCols = [];
       for (let col = 0; col < 5; col++) {
@@ -1153,12 +1217,21 @@ function onKamikazeClick(r, c, ev) {
     }
   }
 
-  const isBomb = appState.km.grid[r][c];
+  const isBomb = Boolean(appState.km.grid && appState.km.grid[r] && appState.km.grid[r][c]);
   const rowEl = document.querySelector(`#kamikazeBoard .board-row[data-r="${r}"]`);
+  if (!rowEl) {
+    appState.km.busy = false;
+    return;
+  }
   const cellEl = rowEl.querySelector(`.cell[data-c="${c}"]`);
+  if (!cellEl) {
+    appState.km.busy = false;
+    return;
+  }
   const rect = cellEl.getBoundingClientRect();
 
   if (isBomb) {
+    appState.km.playing = false;
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -1179,11 +1252,14 @@ function onKamikazeClick(r, c, ev) {
     const mult = KAMIKAZE_ODDS[appState.km.mines][r];
     const currentWin = Math.floor(appState.km.bet * mult);
 
-    document.getElementById("kmCashoutBtn").disabled = false;
-    document.getElementById("kmCashoutSum").textContent = `${formatMoney(currentWin)} UZS (${mult.toFixed(2)}x)`;
+    const cashBtn = document.getElementById("kmCashoutBtn");
+    if (cashBtn) cashBtn.disabled = false;
+    const cashSum = document.getElementById("kmCashoutSum");
+    if (cashSum) cashSum.textContent = `${formatMoney(currentWin)} UZS (${mult.toFixed(2)}x)`;
 
     if (r === 9) {
       appState.km.row = 10;
+      appState.km.busy = false;
       cashoutKamikaze();
     } else {
       // Dinamik bombalar: har bir to'g'ri topilganda keyingi qatorlardagi bombalar joyi o'zgaradi
@@ -1201,18 +1277,22 @@ function onKamikazeClick(r, c, ev) {
       }
       appState.km.row++;
       updateKamikazeActiveRows();
+      appState.km.busy = false;
     }
   }
 }
 
 function revealKamikazeBombs() {
+  if (!Array.isArray(appState.km.grid)) return;
   for (let r = 0; r < 10; r++) {
     const rowEl = document.querySelector(`#kamikazeBoard .board-row[data-r="${r}"]`);
     if (!rowEl) continue;
     for (let c = 0; c < 5; c++) {
       const cell = rowEl.querySelector(`.cell[data-c="${c}"]`);
+      if (!cell) continue;
       if (cell.classList.contains("revealed-safe") || cell.classList.contains("revealed-bomb")) continue;
-      if (appState.km.grid[r][c]) {
+      const isBomb = appState.km.grid[r] && appState.km.grid[r][c];
+      if (isBomb) {
         cell.classList.add("ghost-bomb");
         cell.innerHTML = KM_MODELS.bomb;
       } else {
@@ -1224,7 +1304,13 @@ function revealKamikazeBombs() {
 }
 
 function cashoutKamikaze() {
-  if (!appState.km.playing || document.getElementById("kmCashoutBtn").disabled) return;
+  if (!appState.km.playing || appState.km.busy) return;
+  const cashBtn = document.getElementById("kmCashoutBtn");
+  if (cashBtn && cashBtn.disabled) return;
+  if (cashBtn) cashBtn.disabled = true;
+  appState.km.busy = true;
+  appState.km.playing = false;
+
   const earnedRow = Math.max(0, appState.km.row === 10 ? 9 : appState.km.row - 1);
   const mult = KAMIKAZE_ODDS[appState.km.mines][earnedRow];
   const winSum = Math.floor(appState.km.bet * mult);
@@ -1240,8 +1326,10 @@ function cashoutKamikaze() {
 async function finishKamikazeGame(win, winSum = 0, mult = 0) {
   appState.km.playing = false;
 
-  document.getElementById("kmCashoutBox").style.display = "none";
-  document.getElementById("kmBettingBox").style.display = "flex";
+  const cashBox = document.getElementById("kmCashoutBox");
+  if (cashBox) cashBox.style.display = "none";
+  const betBox = document.getElementById("kmBettingBox");
+  if (betBox) betBox.style.display = "flex";
 
   if (win) {
     updateBalanceUI(appState.balance + winSum, true);
@@ -1250,25 +1338,34 @@ async function finishKamikazeGame(win, winSum = 0, mult = 0) {
     showToast(`💥 Samolyot portladi! (-${formatMoney(appState.km.bet)} UZS)`, false);
   }
 
-  const res = await apiFetch("/api/game-result", "POST", {
-    user_id: USER_ID,
-    game_name: "Kamikaze",
-    bet: appState.km.bet,
-    win: win ? winSum : 0,
-    multiplier: win ? mult : 0
-  });
+  try {
+    const res = await apiFetch("/api/game-result", "POST", {
+      user_id: USER_ID,
+      game_name: "Kamikaze",
+      bet: appState.km.bet,
+      win: win ? winSum : 0,
+      multiplier: win ? mult : 0
+    });
 
-  if (res?.ok && typeof res.balance === "number") {
-    updateBalanceUI(res.balance, false);
-    appState.lastHash = res.provably_hash;
-    document.getElementById("lastProvablyHash").textContent = res.provably_hash;
-    if (res.tasks) renderTasksList(res.tasks);
+    if (res?.ok && typeof res.balance === "number") {
+      updateBalanceUI(res.balance, false);
+      if (res.provably_hash) {
+        appState.lastHash = res.provably_hash;
+        const ph = document.getElementById("lastProvablyHash");
+        if (ph) ph.textContent = res.provably_hash;
+      }
+      if (res.tasks) renderTasksList(res.tasks);
+    }
+  } catch (e) {
+  } finally {
+    appState.km.busy = false;
   }
 
   clearTimeout(kmResetTimer);
   kmResetTimer = setTimeout(() => {
     if (!appState.km.playing) {
       renderKamikazeBoard();
+      updateKamikazeActiveRows();
     }
   }, 1400);
 }
@@ -1366,7 +1463,11 @@ function updateAppleActiveRows() {
       r.classList.add("passed");
     } else if (idx === appState.ap.row) {
       r.classList.add("active");
-      r.scrollIntoView({ behavior: "smooth", block: "center" });
+      const scrollParent = r.closest(".board-scroll-wrap");
+      if (scrollParent) {
+        const targetTop = r.offsetTop - scrollParent.clientHeight / 2 + r.clientHeight / 2;
+        scrollParent.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      }
     } else {
       r.classList.add("disabled");
     }
@@ -1375,6 +1476,7 @@ function updateAppleActiveRows() {
 
 let apResetTimer = null;
 function startAppleGame() {
+  if (appState.ap.playing || appState.ap.busy) return;
   clearTimeout(apResetTimer);
   const betVal = getValidatedBet("apBetInput");
   if (!betVal) return;
@@ -1382,6 +1484,7 @@ function startAppleGame() {
   appState.ap.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
 
+  appState.ap.busy = false;
   appState.ap.playing = true;
   appState.ap.row = 0;
 
@@ -1399,20 +1502,25 @@ function startAppleGame() {
   renderAppleBoard();
   updateAppleActiveRows();
 
-  document.getElementById("appleBettingBox").style.display = "none";
-  document.getElementById("appleCashoutBox").style.display = "block";
-  document.getElementById("appleCashoutBtn").disabled = true;
-  document.getElementById("appleCashoutSum").textContent = "1-qatordan olma tanlang";
+  const betBox = document.getElementById("appleBettingBox");
+  if (betBox) betBox.style.display = "none";
+  const cashBox = document.getElementById("appleCashoutBox");
+  if (cashBox) cashBox.style.display = "block";
+  const cashBtn = document.getElementById("appleCashoutBtn");
+  if (cashBtn) cashBtn.disabled = true;
+  const cashSum = document.getElementById("appleCashoutSum");
+  if (cashSum) cashSum.textContent = "1-qatordan olma tanlang";
 
   triggerHaptic("medium");
 }
 
 function onAppleClick(r, c, ev) {
-  if (!appState.ap.playing || r !== appState.ap.row) return;
+  if (!appState.ap.playing || appState.ap.busy || r !== appState.ap.row) return;
+  appState.ap.busy = true;
 
   // Smart house edge (fair in normal mode, 85% in evil mode)
   const apTrapChance = appState.evilMode ? 0.85 : 0.0;
-  if (Math.random() < apTrapChance) {
+  if (Math.random() < apTrapChance && appState.ap.grid && appState.ap.grid[r]) {
     if (!appState.ap.grid[r][c]) {
       const rottenCols = [];
       for (let col = 0; col < 4; col++) {
@@ -1426,12 +1534,21 @@ function onAppleClick(r, c, ev) {
     }
   }
 
-  const isRotten = appState.ap.grid[r][c];
+  const isRotten = Boolean(appState.ap.grid && appState.ap.grid[r] && appState.ap.grid[r][c]);
   const rowEl = document.querySelector(`#appleBoard .board-row[data-r="${r}"]`);
+  if (!rowEl) {
+    appState.ap.busy = false;
+    return;
+  }
   const cellEl = rowEl.querySelector(`.cell[data-c="${c}"]`);
+  if (!cellEl) {
+    appState.ap.busy = false;
+    return;
+  }
   const rect = cellEl.getBoundingClientRect();
 
   if (isRotten) {
+    appState.ap.playing = false;
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -1452,11 +1569,14 @@ function onAppleClick(r, c, ev) {
     const mult = APPLE_ODDS[r];
     const currentWin = Math.floor(appState.ap.bet * mult);
 
-    document.getElementById("appleCashoutBtn").disabled = false;
-    document.getElementById("appleCashoutSum").textContent = `${formatMoney(currentWin)} UZS (${mult.toFixed(2)}x)`;
+    const cashBtn = document.getElementById("appleCashoutBtn");
+    if (cashBtn) cashBtn.disabled = false;
+    const cashSum = document.getElementById("appleCashoutSum");
+    if (cashSum) cashSum.textContent = `${formatMoney(currentWin)} UZS (${mult.toFixed(2)}x)`;
 
     if (r === 9) {
       appState.ap.row = 10;
+      appState.ap.busy = false;
       cashoutApple();
     } else {
       // 1xBet kabi: har 1 ta to'g'ri olma topilganda, keyingi barcha qatorlardagi noto'g'ri olmalar joyi dinamik o'zgaradi!
@@ -1470,18 +1590,22 @@ function onAppleClick(r, c, ev) {
       }
       appState.ap.row++;
       updateAppleActiveRows();
+      appState.ap.busy = false;
     }
   }
 }
 
 function revealAppleMines() {
+  if (!Array.isArray(appState.ap.grid)) return;
   for (let r = 0; r < 10; r++) {
     const rowEl = document.querySelector(`#appleBoard .board-row[data-r="${r}"]`);
     if (!rowEl) continue;
     for (let c = 0; c < 4; c++) {
       const cell = rowEl.querySelector(`.cell[data-c="${c}"]`);
+      if (!cell) continue;
       if (cell.classList.contains("revealed-safe") || cell.classList.contains("revealed-bomb")) continue;
-      if (appState.ap.grid[r][c]) {
+      const isBomb = appState.ap.grid[r] && appState.ap.grid[r][c];
+      if (isBomb) {
         cell.classList.add("ghost-bomb");
         cell.innerHTML = APPLE_MODELS.bomb;
       } else {
@@ -1493,7 +1617,13 @@ function revealAppleMines() {
 }
 
 function cashoutApple() {
-  if (!appState.ap.playing || document.getElementById("appleCashoutBtn").disabled) return;
+  if (!appState.ap.playing || appState.ap.busy) return;
+  const cashBtn = document.getElementById("appleCashoutBtn");
+  if (cashBtn && cashBtn.disabled) return;
+  if (cashBtn) cashBtn.disabled = true;
+  appState.ap.busy = true;
+  appState.ap.playing = false;
+
   const earnedRow = Math.max(0, appState.ap.row === 10 ? 9 : appState.ap.row - 1);
   const mult = APPLE_ODDS[earnedRow];
   const winSum = Math.floor(appState.ap.bet * mult);
@@ -1509,8 +1639,10 @@ function cashoutApple() {
 async function finishAppleGame(win, winSum = 0, mult = 0) {
   appState.ap.playing = false;
 
-  document.getElementById("appleCashoutBox").style.display = "none";
-  document.getElementById("appleBettingBox").style.display = "flex";
+  const cashBox = document.getElementById("appleCashoutBox");
+  if (cashBox) cashBox.style.display = "none";
+  const betBox = document.getElementById("appleBettingBox");
+  if (betBox) betBox.style.display = "flex";
 
   if (win) {
     updateBalanceUI(appState.balance + winSum, true);
@@ -1519,25 +1651,34 @@ async function finishAppleGame(win, winSum = 0, mult = 0) {
     showToast(`🍏 Zaharli olma chiqdi! (-${formatMoney(appState.ap.bet)} UZS)`, false);
   }
 
-  const res = await apiFetch("/api/game-result", "POST", {
-    user_id: USER_ID,
-    game_name: "Apple of Fortune",
-    bet: appState.ap.bet,
-    win: win ? winSum : 0,
-    multiplier: win ? mult : 0
-  });
+  try {
+    const res = await apiFetch("/api/game-result", "POST", {
+      user_id: USER_ID,
+      game_name: "Apple of Fortune",
+      bet: appState.ap.bet,
+      win: win ? winSum : 0,
+      multiplier: win ? mult : 0
+    });
 
-  if (res?.ok && typeof res.balance === "number") {
-    updateBalanceUI(res.balance, false);
-    appState.lastHash = res.provably_hash;
-    document.getElementById("lastProvablyHash").textContent = res.provably_hash;
-    if (res.tasks) renderTasksList(res.tasks);
+    if (res?.ok && typeof res.balance === "number") {
+      updateBalanceUI(res.balance, false);
+      if (res.provably_hash) {
+        appState.lastHash = res.provably_hash;
+        const ph = document.getElementById("lastProvablyHash");
+        if (ph) ph.textContent = res.provably_hash;
+      }
+      if (res.tasks) renderTasksList(res.tasks);
+    }
+  } catch (e) {
+  } finally {
+    appState.ap.busy = false;
   }
 
   clearTimeout(apResetTimer);
   apResetTimer = setTimeout(() => {
     if (!appState.ap.playing) {
       renderAppleBoard();
+      updateAppleActiveRows();
     }
   }, 1400);
 }
@@ -2732,13 +2873,14 @@ document.getElementById("mnStartBtn")?.addEventListener("click", startMinesGame)
 document.getElementById("minesCashoutBtn")?.addEventListener("click", cashoutMinesGame);
 
 function startMinesGame() {
-  if (appState.mn.playing) return;
+  if (appState.mn.playing || appState.mn.busy) return;
   const betVal = getValidatedBet("mnBetInput");
   if (!betVal) return;
 
   appState.mn.bet = betVal;
   updateBalanceUI(appState.balance - betVal);
 
+  appState.mn.busy = false;
   appState.mn.playing = true;
   appState.mn.openedCount = 0;
   appState.mn.currentMult = 1.00;
@@ -2757,19 +2899,24 @@ function startMinesGame() {
 
   renderMinesBoard();
 
-  document.getElementById("minesBettingBox").style.display = "none";
-  document.getElementById("minesCashoutBox").style.display = "block";
-  document.getElementById("minesCashoutBtn").disabled = true;
-  document.getElementById("minesCashoutSum").textContent = "Katakni tanlang";
+  const betBox = document.getElementById("minesBettingBox");
+  if (betBox) betBox.style.display = "none";
+  const cashBox = document.getElementById("minesCashoutBox");
+  if (cashBox) cashBox.style.display = "block";
+  const cashBtn = document.getElementById("minesCashoutBtn");
+  if (cashBtn) cashBtn.disabled = true;
+  const cashSum = document.getElementById("minesCashoutSum");
+  if (cashSum) cashSum.textContent = "Katakni tanlang";
   triggerHaptic("medium");
 }
 
 async function onMineTileClick(idx) {
-  if (!appState.mn.playing || appState.mn.revealed[idx]) return;
+  if (!appState.mn.playing || appState.mn.busy || appState.mn.revealed[idx]) return;
+  appState.mn.busy = true;
 
   // Smart house edge (fair in normal mode, 85% in evil mode)
   const mnTrapChance = appState.evilMode ? 0.85 : 0.0;
-  if (Math.random() < mnTrapChance && (appState.mn.openedCount >= 1 || appState.evilMode)) {
+  if (Math.random() < mnTrapChance && (appState.mn.openedCount >= 1 || appState.evilMode) && appState.mn.grid) {
     if (!appState.mn.grid[idx]) {
       const unrevealedMineIndices = [];
       for (let i = 0; i < 25; i++) {
@@ -2786,8 +2933,13 @@ async function onMineTileClick(idx) {
   }
 
   const tileEl = document.querySelector(`.mine-tile[data-idx="${idx}"]`);
+  if (!tileEl) {
+    appState.mn.busy = false;
+    return;
+  }
+
   appState.mn.revealed[idx] = true;
-  const isMine = appState.mn.grid[idx];
+  const isMine = Boolean(appState.mn.grid && appState.mn.grid[idx]);
 
   if (isMine) {
     appState.mn.playing = false;
@@ -2799,7 +2951,7 @@ async function onMineTileClick(idx) {
 
     document.querySelectorAll(".mine-tile").forEach((t, i) => {
       if (i !== idx) {
-        if (appState.mn.grid[i]) {
+        if (appState.mn.grid && appState.mn.grid[i]) {
           t.classList.add("ghost-bomb");
           t.innerHTML = MINES_MODELS.bomb;
         } else {
@@ -2809,25 +2961,30 @@ async function onMineTileClick(idx) {
       }
     });
 
-    const res = await apiFetch("/api/game-result", "POST", {
-      user_id: USER_ID,
-      game_name: "mines",
-      bet: appState.mn.bet,
-      win: 0,
-      multiplier: 0
-    });
-    if (res?.ok) {
-      if (res.provably_hash) appState.lastHash = res.provably_hash;
-      if (res.tasks) renderTasksList(res.tasks);
-    }
+    try {
+      const res = await apiFetch("/api/game-result", "POST", {
+        user_id: USER_ID,
+        game_name: "mines",
+        bet: appState.mn.bet,
+        win: 0,
+        multiplier: 0
+      });
+      if (res?.ok) {
+        if (res.provably_hash) appState.lastHash = res.provably_hash;
+        if (res.tasks) renderTasksList(res.tasks);
+      }
+    } catch (e) {}
 
     showToast(`💥 Mina portladi! -${formatMoney(appState.mn.bet)} UZS`, false);
 
     setTimeout(() => {
-      document.getElementById("minesCashoutBox").style.display = "none";
-      document.getElementById("minesBettingBox").style.display = "block";
+      const cashBox = document.getElementById("minesCashoutBox");
+      if (cashBox) cashBox.style.display = "none";
+      const betBox = document.getElementById("minesBettingBox");
+      if (betBox) betBox.style.display = "block";
       appState.mn.currentMult = 1.00;
       updateMinesInfoDisplays();
+      appState.mn.busy = false;
     }, 1800);
   } else {
     audio.play("gem", appState.mn.openedCount);
@@ -2841,18 +2998,26 @@ async function onMineTileClick(idx) {
 
     const currWin = Math.floor(appState.mn.bet * appState.mn.currentMult);
     const cashoutBtn = document.getElementById("minesCashoutBtn");
-    cashoutBtn.disabled = false;
-    document.getElementById("minesCashoutSum").textContent = `${formatMoney(currWin)} UZS (x${appState.mn.currentMult.toFixed(2)})`;
+    if (cashoutBtn) cashoutBtn.disabled = false;
+    const cashSum = document.getElementById("minesCashoutSum");
+    if (cashSum) cashSum.textContent = `${formatMoney(currWin)} UZS (x${appState.mn.currentMult.toFixed(2)})`;
 
     const totalSafe = 25 - appState.mn.mines;
     if (appState.mn.openedCount >= totalSafe) {
+      appState.mn.busy = false;
       cashoutMinesGame();
+    } else {
+      appState.mn.busy = false;
     }
   }
 }
 
 async function cashoutMinesGame() {
-  if (!appState.mn.playing) return;
+  if (!appState.mn.playing || appState.mn.busy) return;
+  const cashBtn = document.getElementById("minesCashoutBtn");
+  if (cashBtn && cashBtn.disabled) return;
+  if (cashBtn) cashBtn.disabled = true;
+  appState.mn.busy = true;
   appState.mn.playing = false;
 
   const winSum = Math.floor(appState.mn.bet * appState.mn.currentMult);
@@ -2863,7 +3028,7 @@ async function cashoutMinesGame() {
 
   document.querySelectorAll(".mine-tile").forEach((t, i) => {
     if (!appState.mn.revealed[i]) {
-      if (appState.mn.grid[i]) {
+      if (appState.mn.grid && appState.mn.grid[i]) {
         t.classList.add("ghost-bomb");
         t.innerHTML = MINES_MODELS.bomb;
       } else {
@@ -2873,26 +3038,31 @@ async function cashoutMinesGame() {
     }
   });
 
-  const res = await apiFetch("/api/game-result", "POST", {
-    user_id: USER_ID,
-    game_name: "mines",
-    bet: appState.mn.bet,
-    win: winSum,
-    multiplier: appState.mn.currentMult
-  });
-  if (res?.ok) {
-    if (res.provably_hash) appState.lastHash = res.provably_hash;
-    if (res.tasks) renderTasksList(res.tasks);
-  }
+  try {
+    const res = await apiFetch("/api/game-result", "POST", {
+      user_id: USER_ID,
+      game_name: "mines",
+      bet: appState.mn.bet,
+      win: winSum,
+      multiplier: appState.mn.currentMult
+    });
+    if (res?.ok) {
+      if (res.provably_hash) appState.lastHash = res.provably_hash;
+      if (res.tasks) renderTasksList(res.tasks);
+    }
+  } catch (e) {}
 
   showToast(`🎉 +${formatMoney(winSum)} UZS! Yutuq olindi!`, true);
 
   setTimeout(() => {
-    document.getElementById("minesCashoutBox").style.display = "none";
-    document.getElementById("minesBettingBox").style.display = "block";
+    const cashBox = document.getElementById("minesCashoutBox");
+    if (cashBox) cashBox.style.display = "none";
+    const betBox = document.getElementById("minesBettingBox");
+    if (betBox) betBox.style.display = "block";
     appState.mn.currentMult = 1.00;
     renderMinesBoard();
     updateMinesInfoDisplays();
+    appState.mn.busy = false;
   }, 1800);
 }
 
@@ -3745,7 +3915,7 @@ async function finishSpin(sector, sectorIndex) {
     const canvasEl = document.getElementById("wheelCanvas");
     if (canvasEl) {
       const rect = canvasEl.getBoundingClientRect();
-      particleFx.explode(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      fx.explode(rect.left + rect.width / 2, rect.top + rect.height / 2);
     }
 
     if (msgEl) {
@@ -3957,7 +4127,7 @@ async function playCoinFlip() {
       audio.play("win");
       triggerHaptic("heavy");
       triggerScreenShake();
-      particleFx.explode(window.innerWidth / 2, window.innerHeight * 0.38);
+      fx.explode(window.innerWidth / 2, window.innerHeight * 0.38);
 
       if (banner) {
         banner.className = "cf-result-banner win";
