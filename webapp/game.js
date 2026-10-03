@@ -948,7 +948,8 @@ function openGameView(viewId) {
   if (viewId === "view-crash") {
     initCrashGame();
   } else {
-    if (appState.cr.animId && appState.cr.state === "idle") {
+    stopAviatorOnlinePolling();
+    if (appState.cr.animId) {
       cancelAnimationFrame(appState.cr.animId);
       appState.cr.animId = null;
     }
@@ -967,7 +968,7 @@ function returnToLobby() {
   document.getElementById("tab-lobby").classList.add("active");
   document.querySelector('.tab-btn[data-tab="lobby"]').classList.add("active");
 
-  if (appState.cr.animId && appState.cr.state === "idle") {
+  if (appState.cr.animId) {
     cancelAnimationFrame(appState.cr.animId);
     appState.cr.animId = null;
   }
@@ -1004,7 +1005,6 @@ document.querySelectorAll('.game-card[data-game="apple"]').forEach(c => {
 document.querySelectorAll('.game-card[data-game="crash"]').forEach(c => {
   c.addEventListener("click", () => {
     openGameView("view-crash");
-    initCrashGame();
   });
 });
 
@@ -1577,16 +1577,24 @@ document.getElementById("apMax").addEventListener("click", () => {
   adjustBetInput("apBetInput", "max");
 });
 
+function resizeCrashCanvas() {
+  if (!crashCanvas) crashCanvas = document.getElementById("crashCanvas");
+  if (!crashCanvas) return;
+  const parent = crashCanvas.parentElement;
+  const w = parent && parent.clientWidth > 20 ? parent.clientWidth : 360;
+  const h = parent && parent.clientHeight > 20 ? parent.clientHeight : 220;
+  if (crashCanvas.width !== w || crashCanvas.height !== h) {
+    crashCanvas.width = w;
+    crashCanvas.height = h;
+  }
+}
+window.addEventListener("resize", resizeCrashCanvas);
+
 function initCrashCanvas() {
   crashCanvas = document.getElementById("crashCanvas");
   if (!crashCanvas) return;
   crashCtx = crashCanvas.getContext("2d");
-  if (crashCanvas.parentElement) {
-    crashCanvas.width = crashCanvas.parentElement.clientWidth;
-    crashCanvas.height = crashCanvas.parentElement.clientHeight;
-  }
-  cancelAnimationFrame(appState.cr.animId);
-  appState.cr.animId = requestAnimationFrame(crashLoop);
+  resizeCrashCanvas();
 }
 
 function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
@@ -1595,8 +1603,9 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.rotate(angle);
 
   if (!isCrashed) {
-    const flicker1 = Math.sin(time * 45) * 6;
-    const flicker2 = Math.cos(time * 38) * 5;
+    // Jet Engine Afterburner Flame
+    const flicker1 = Math.sin(time * 45) * 5;
+    const flicker2 = Math.cos(time * 38) * 4;
     const flameLen = 22 + flicker1;
 
     const flameGrad = ctx.createLinearGradient(-flameLen - 12, 0, -10, 0);
@@ -1613,6 +1622,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
     ctx.closePath();
     ctx.fill();
 
+    // Hot inner flame core
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
     ctx.moveTo(-10, -2);
@@ -1621,6 +1631,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
     ctx.closePath();
     ctx.fill();
 
+    // Supersonic Mach Shock Rings
     const shockPulse = (time * 8) % 1;
     ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 * (1 - shockPulse)})`;
     ctx.lineWidth = 1.5;
@@ -1629,6 +1640,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
     ctx.stroke();
   }
 
+  // Red Fuselage Body
   ctx.fillStyle = "#e02020";
   ctx.beginPath();
   ctx.moveTo(30, 0);
@@ -1641,6 +1653,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.closePath();
   ctx.fill();
 
+  // White Speed Stripe
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
   ctx.moveTo(28, 0);
@@ -1650,6 +1663,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.closePath();
   ctx.fill();
 
+  // Main Wing Top
   ctx.fillStyle = "#a81313";
   ctx.beginPath();
   ctx.moveTo(6, -6);
@@ -1659,6 +1673,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.closePath();
   ctx.fill();
 
+  // Wing Tip White Decal
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
   ctx.moveTo(-10, -26);
@@ -1668,6 +1683,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.closePath();
   ctx.fill();
 
+  // Wing Bottom
   ctx.fillStyle = "#7a0c0c";
   ctx.beginPath();
   ctx.moveTo(4, 6);
@@ -1677,6 +1693,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.closePath();
   ctx.fill();
 
+  // Tail Fin
   ctx.fillStyle = "#b81616";
   ctx.beginPath();
   ctx.moveTo(-14, -5);
@@ -1686,6 +1703,7 @@ function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
   ctx.closePath();
   ctx.fill();
 
+  // Cockpit Tinted Canopy Glass
   const canopyGrad = ctx.createLinearGradient(8, -6, 20, 0);
   canopyGrad.addColorStop(0, "rgba(0, 240, 255, 0.9)");
   canopyGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.95)");
@@ -1728,10 +1746,20 @@ function drawCrashGrid(w, h) {
 function crashLoop(now) {
   if (!crashCtx) return;
   const crashView = document.getElementById("view-crash");
-  if (crashView && crashView.style.display === "none" && appState.cr.state === "idle") {
-    appState.cr.animId = null;
+  // Immediately stop animation if view is not visible
+  if (!crashView || crashView.style.display === "none") {
+    if (appState.cr.animId) {
+      cancelAnimationFrame(appState.cr.animId);
+      appState.cr.animId = null;
+    }
     return;
   }
+
+  // Ensure canvas dimensions match parent container
+  if (crashCanvas.width <= 20 || crashCanvas.height <= 20) {
+    resizeCrashCanvas();
+  }
+
   const w = crashCanvas.width;
   const h = crashCanvas.height;
   crashCtx.clearRect(0, 0, w, h);
@@ -1739,18 +1767,19 @@ function crashLoop(now) {
   drawCrashGrid(w, h);
 
   const multText = document.getElementById("crashMultText");
-  const badge = document.getElementById("crashStateBadge");
   const actionBtn = document.getElementById("crashActionBtn");
 
   if (appState.cr.state === "idle") {
-    multText.style.display = "block";
-    multText.className = "crash-multiplier-center";
-    multText.textContent = "1.00x";
+    if (multText) {
+      multText.style.display = "block";
+      multText.className = "crash-multiplier-center";
+      multText.textContent = "1.00x";
+    }
 
-    const planeY = (h - 30) - 10 + Math.sin(now * 0.004) * 2;
+    const planeY = (h - 30) - 10 + Math.sin(now * 0.0035) * 2;
     drawAviatorPlane(crashCtx, 60, planeY, 0, false, now * 0.001);
   } else if (appState.cr.state === "countdown") {
-    multText.style.display = "none";
+    if (multText) multText.style.display = "none";
     const elapsedCd = (now - appState.cr.countdownStart) / 1000;
     const remaining = Math.max(0, appState.cr.countdownDuration - elapsedCd);
 
@@ -1761,10 +1790,10 @@ function crashLoop(now) {
       triggerHaptic("light");
     }
 
-    actionBtn.className = "btn-crash-action btn-cancel-mode";
-    actionBtn.textContent = `BEKOR QILISH (${remaining.toFixed(1)}s)`;
-    badge.textContent = `KUTILMOQDA: ${remaining.toFixed(1)}s`;
-    badge.style.color = "var(--one-yellow)";
+    if (actionBtn) {
+      actionBtn.className = "btn-crash-action btn-cancel-mode";
+      actionBtn.textContent = `BEKOR QILISH (${remaining.toFixed(1)}s)`;
+    }
 
     const planeY = (h - 30) - 10 + Math.sin(now * 0.02) * 1.5;
     drawAviatorPlane(crashCtx, 60, planeY, 0, false, now * 0.001);
@@ -1802,17 +1831,19 @@ function crashLoop(now) {
       launchCrashFlight();
     }
   } else if (appState.cr.state === "flying") {
-    multText.style.display = "block";
+    if (multText) multText.style.display = "block";
     let currentMult = 1.00;
     if (appState.cr.mode === "online") {
       const elapsed = Math.max(0, (now - (appState.cr.flightStartTime || now)) / 1000);
       const simulated = Math.max(1.00, 1.00 + 0.08 * Math.pow(elapsed, 1.65));
       const target = Math.max(simulated, appState.cr.targetMultiplier || 1.00);
-      appState.cr.multiplier += (target - appState.cr.multiplier) * 0.12;
+      appState.cr.multiplier += (target - appState.cr.multiplier) * 0.15;
       currentMult = appState.cr.multiplier;
 
-      multText.className = "crash-multiplier-center";
-      multText.textContent = `${currentMult.toFixed(2)}x`;
+      if (multText) {
+        multText.className = "crash-multiplier-center";
+        multText.textContent = `${currentMult.toFixed(2)}x`;
+      }
 
       if (actionBtn && appState.cr.myBetPlaced && !appState.cr.userCashedOut) {
         const curWin = Math.floor(appState.cr.myBetAmount * currentMult);
@@ -1824,10 +1855,12 @@ function crashLoop(now) {
       currentMult = Math.max(1.00, 1.00 + 0.08 * Math.pow(elapsed, 1.65));
       appState.cr.multiplier = currentMult;
 
-      multText.className = "crash-multiplier-center";
-      multText.textContent = `${currentMult.toFixed(2)}x`;
+      if (multText) {
+        multText.className = "crash-multiplier-center";
+        multText.textContent = `${currentMult.toFixed(2)}x`;
+      }
 
-      if (!appState.cr.userCashedOut) {
+      if (actionBtn && !appState.cr.userCashedOut) {
         const curWin = Math.floor(appState.cr.bet * currentMult);
         actionBtn.className = "btn-crash-action btn-cashout-mode";
         actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
@@ -1836,17 +1869,17 @@ function crashLoop(now) {
 
     const x0 = 35;
     const y0 = h - 30;
-    const targetX = w * 0.70;
-    const targetY = h * 0.30;
+    const targetX = w * 0.72;
+    const targetY = h * 0.28;
 
     let px, py, angle;
     if (currentMult <= 2.5) {
-      const p = (currentMult - 1.0) / 1.5;
-      px = x0 + (targetX - x0) * Math.min(1.0, p);
-      py = y0 - (y0 - targetY) * Math.pow(Math.min(1.0, p), 1.25);
+      const p = Math.min(1.0, (currentMult - 1.0) / 1.5);
+      px = x0 + (targetX - x0) * p;
+      py = y0 - (y0 - targetY) * Math.pow(p, 1.25);
       angle = -0.38 + 0.12 * p;
     } else {
-      px = targetX + Math.sin(now * 0.0022) * (w * 0.06);
+      px = targetX + Math.sin(now * 0.0022) * (w * 0.05);
       py = targetY + Math.cos(now * 0.0026) * 10;
       angle = -0.26 + Math.sin(now * 0.0022) * 0.06;
     }
@@ -1855,9 +1888,10 @@ function crashLoop(now) {
     appState.cr.lastPlaneY = py;
     appState.cr.lastPlaneAngle = angle;
 
+    // Soft gradient below trajectory
     const grad = crashCtx.createLinearGradient(0, py, 0, y0);
-    grad.addColorStop(0, "rgba(255, 71, 87, 0.42)");
-    grad.addColorStop(0.6, "rgba(255, 71, 87, 0.10)");
+    grad.addColorStop(0, "rgba(255, 71, 87, 0.35)");
+    grad.addColorStop(0.6, "rgba(255, 71, 87, 0.08)");
     grad.addColorStop(1, "rgba(255, 71, 87, 0.0)");
 
     crashCtx.beginPath();
@@ -1868,31 +1902,35 @@ function crashLoop(now) {
     crashCtx.fillStyle = grad;
     crashCtx.fill();
 
+    // High performance neon glowing line (zero shadowBlur lag)
     crashCtx.beginPath();
     crashCtx.moveTo(x0, y0);
     crashCtx.quadraticCurveTo(px * 0.45, y0, px, py);
-    crashCtx.lineWidth = 4;
-    crashCtx.strokeStyle = "#ff4757";
-    crashCtx.shadowColor = "#ff4757";
-    crashCtx.shadowBlur = 14;
+    crashCtx.lineWidth = 7;
+    crashCtx.strokeStyle = "rgba(255, 71, 87, 0.25)";
     crashCtx.stroke();
-    crashCtx.shadowBlur = 0;
 
-    // Jet Exhaust Particles
+    crashCtx.lineWidth = 3.5;
+    crashCtx.strokeStyle = "#ff4757";
+    crashCtx.stroke();
+
+    // Hardware-accelerated additive exhaust particles (max 35 cap)
     if (!appState.cr.particles) appState.cr.particles = [];
-    for (let pi = 0; pi < 2; pi++) {
+    if (appState.cr.particles.length < 35) {
       appState.cr.particles.push({
         x: px - 20 * Math.cos(angle),
         y: py - 20 * Math.sin(angle),
-        vx: -Math.cos(angle) * (3 + Math.random() * 3) + (Math.random() - 0.5) * 2,
-        vy: -Math.sin(angle) * (3 + Math.random() * 3) + (Math.random() - 0.5) * 2,
-        r: 2.5 + Math.random() * 3,
-        color: Math.random() < 0.5 ? "#ff4757" : (Math.random() < 0.8 ? "#ffa502" : "#ffffff"),
+        vx: -Math.cos(angle) * (3.5 + Math.random() * 2.5) + (Math.random() - 0.5) * 1.5,
+        vy: -Math.sin(angle) * (3.5 + Math.random() * 2.5) + (Math.random() - 0.5) * 1.5,
+        r: 2.2 + Math.random() * 2.5,
+        color: Math.random() < 0.5 ? "rgba(255, 71, 87, " : (Math.random() < 0.8 ? "rgba(255, 165, 2, " : "rgba(255, 255, 255, "),
         alpha: 0.9,
-        decay: 0.05 + Math.random() * 0.04
+        decay: 0.04 + Math.random() * 0.03
       });
     }
 
+    crashCtx.save();
+    crashCtx.globalCompositeOperation = "lighter";
     for (let i = appState.cr.particles.length - 1; i >= 0; i--) {
       const pt = appState.cr.particles[i];
       pt.x += pt.vx;
@@ -1902,16 +1940,12 @@ function crashLoop(now) {
         appState.cr.particles.splice(i, 1);
         continue;
       }
-      crashCtx.save();
-      crashCtx.globalAlpha = pt.alpha;
-      crashCtx.fillStyle = pt.color;
-      crashCtx.shadowColor = pt.color;
-      crashCtx.shadowBlur = 6;
+      crashCtx.fillStyle = pt.color + pt.alpha + ")";
       crashCtx.beginPath();
       crashCtx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
       crashCtx.fill();
-      crashCtx.restore();
     }
+    crashCtx.restore();
 
     drawAviatorPlane(crashCtx, px, py, angle, false, now * 0.001);
 
@@ -1919,24 +1953,28 @@ function crashLoop(now) {
       endCrashRound(false);
     }
   } else if (appState.cr.state === "crashed") {
-    multText.style.display = "block";
+    if (multText) multText.style.display = "block";
     const x0 = 35;
     const y0 = h - 30;
-    const px = appState.cr.lastPlaneX;
-    const py = appState.cr.lastPlaneY;
+    const px = appState.cr.lastPlaneX || (w * 0.70);
+    const py = appState.cr.lastPlaneY || (h * 0.30);
 
+    // Dashed trajectory of completed flight
+    crashCtx.save();
+    crashCtx.setLineDash([5, 5]);
     crashCtx.beginPath();
     crashCtx.moveTo(x0, y0);
     crashCtx.quadraticCurveTo(px * 0.45, y0, px, py);
-    crashCtx.lineWidth = 3;
-    crashCtx.strokeStyle = "rgba(231, 76, 60, 0.6)";
+    crashCtx.lineWidth = 2.5;
+    crashCtx.strokeStyle = "rgba(231, 76, 60, 0.45)";
     crashCtx.stroke();
+    crashCtx.restore();
 
-    appState.cr.zoomOffset += 12;
+    appState.cr.zoomOffset = (appState.cr.zoomOffset || 0) + 12;
     const flyX = px + appState.cr.zoomOffset;
-    const flyY = py - appState.cr.zoomOffset * 0.8;
+    const flyY = py - appState.cr.zoomOffset * 0.75;
 
-    if (flyX < w + 60 && flyY > -60) {
+    if (flyX < w + 80 && flyY > -80) {
       drawAviatorPlane(crashCtx, flyX, flyY, -0.65, true, now * 0.001);
     }
   }
@@ -1951,14 +1989,31 @@ function renderAviatorLiveBets(bets, currentUserBet) {
   const totalPlayersEl = document.getElementById("crTotalPlayers");
   const totalPoolEl = document.getElementById("crTotalPool");
 
-  if (totalPlayersEl) totalPlayersEl.textContent = bets.length;
+  const safeBets = Array.isArray(bets) ? bets : [];
+  if (totalPlayersEl) totalPlayersEl.textContent = safeBets.length;
   let pool = 0;
-  bets.forEach(b => pool += (b.bet || 0));
+  safeBets.forEach(b => pool += (b.bet || 0));
   if (totalPoolEl) totalPoolEl.textContent = `BANK: ${formatMoney(pool)} UZS`;
 
-  table.innerHTML = bets.map(b => {
+  // Signature check: do NOT touch DOM if bets didn't change
+  const sig = JSON.stringify(safeBets.map(b => [b.user_id, b.bet, b.status, b.win, b.cashout_mult]));
+  if (sig === appState.cr.lastBetsSignature) return;
+  appState.cr.lastBetsSignature = sig;
+
+  if (safeBets.length === 0) {
+    table.innerHTML = `
+      <div class="cr-empty-bets">
+        <div class="cr-empty-icon">👥</div>
+        <div class="cr-empty-title">Hozircha hech kim stavka qilmadi</div>
+        <div class="cr-empty-desc">Ushbu raundda birinchi bo'lib stavka qiling!</div>
+      </div>
+    `;
+    return;
+  }
+
+  table.innerHTML = safeBets.map(b => {
     const isMe = b.user_id === USER_ID;
-    const initial = (b.name || "U")[0].toUpperCase();
+    const initial = (b.name || "O")[0].toUpperCase();
     const uname = b.username ? `@${b.username}` : (b.name || "O'yinchi");
     let rowClass = "cf-bet-row cr-bet-row";
     let badgeHtml = "";
@@ -1971,7 +2026,7 @@ function renderAviatorLiveBets(bets, currentUserBet) {
       rowClass += " loser";
       badgeHtml = `<span class="cf-p-badge lose">-${formatMoney(b.bet)} UZS</span>`;
     } else {
-      badgeHtml = `<span class="cf-p-badge pending">Uchmoqda... ⏳</span>`;
+      badgeHtml = `<span class="cf-p-badge pending">Uchmoqda... 🚀</span>`;
     }
 
     if (isMe) rowClass += " me";
@@ -1995,7 +2050,7 @@ let crOnlinePollTimer = null;
 function startAviatorOnlinePolling() {
   if (crOnlinePollTimer) return;
   fetchAviatorOnlineStatus();
-  crOnlinePollTimer = setInterval(fetchAviatorOnlineStatus, 400);
+  crOnlinePollTimer = setInterval(fetchAviatorOnlineStatus, 450);
 }
 
 function stopAviatorOnlinePolling() {
@@ -2007,9 +2062,13 @@ function stopAviatorOnlinePolling() {
 
 async function fetchAviatorOnlineStatus() {
   if (appState.cr.mode !== "online") return;
+  const crashView = document.getElementById("view-crash");
+  if (!crashView || crashView.style.display === "none") return;
+
   try {
     const data = await apiFetch(`/api/aviator/status?user_id=${USER_ID}`);
-    if (!data?.ok) return;
+    // Check mode again in case user switched while waiting for response
+    if (appState.cr.mode !== "online" || !data?.ok) return;
 
     appState.cr.roundId = data.round_id;
     appState.cr.onlinePhase = data.phase;
@@ -2018,15 +2077,20 @@ async function fetchAviatorOnlineStatus() {
     const roundTag = document.getElementById("crRoundTag");
     if (roundTag) roundTag.textContent = `RAUND #${data.round_id}`;
 
-    const histEl = document.getElementById("crHistoryStrip");
-    if (histEl && data.history) {
-      histEl.innerHTML = data.history.map(m => {
-        let cls = "mult-low";
-        if (m >= 10.0) cls = "mult-epic";
-        else if (m >= 3.0) cls = "mult-high";
-        else if (m >= 1.5) cls = "mult-mid";
-        return `<span class="cr-h-badge ${cls}">${m.toFixed(2)}x</span>`;
-      }).join("");
+    // Update history badges only when changed
+    const histSig = JSON.stringify(data.history || []);
+    if (histSig !== appState.cr.lastHistorySignature) {
+      appState.cr.lastHistorySignature = histSig;
+      const histEl = document.getElementById("crHistoryStrip");
+      if (histEl && data.history) {
+        histEl.innerHTML = data.history.map(m => {
+          let cls = "mult-low";
+          if (m >= 10.0) cls = "mult-epic";
+          else if (m >= 3.0) cls = "mult-high";
+          else if (m >= 1.5) cls = "mult-mid";
+          return `<span class="cr-h-badge ${cls}">${m.toFixed(2)}x</span>`;
+        }).join("");
+      }
     }
 
     renderAviatorLiveBets(data.bets || [], data.user_bet);
@@ -2041,6 +2105,7 @@ async function fetchAviatorOnlineStatus() {
       appState.cr.multiplier = 1.00;
       appState.cr.userCashedOut = false;
       appState.cr.particles = [];
+      appState.cr.zoomOffset = 0;
       if (timerText) timerText.textContent = `${data.time_left.toFixed(1)}s`;
       if (phaseText) phaseText.textContent = "STAVKALAR QABUL QILINMOQDA";
       if (multText) {
@@ -2063,6 +2128,8 @@ async function fetchAviatorOnlineStatus() {
         appState.cr.flightStartTime = performance.now();
         audio.play("takeoff");
         triggerHaptic("medium");
+        appState.cr.particles = [];
+        appState.cr.zoomOffset = 0;
       }
       appState.cr.targetMultiplier = data.multiplier;
       appState.cr.crashPoint = data.crash_point;
@@ -2137,6 +2204,9 @@ function setCrashMode(mode) {
     if (liveCard) liveCard.style.display = "none";
     stopAviatorOnlinePolling();
     appState.cr.state = "idle";
+    appState.cr.multiplier = 1.00;
+    appState.cr.particles = [];
+    appState.cr.zoomOffset = 0;
     const actionBtn = document.getElementById("crashActionBtn");
     if (actionBtn) {
       actionBtn.className = "btn-crash-action btn-ready";
@@ -2153,9 +2223,11 @@ function setCrashMode(mode) {
 let crashTabsBound = false;
 function initCrashGame() {
   initCrashCanvas();
-  if (!appState.cr.animId) {
-    appState.cr.animId = requestAnimationFrame(crashLoop);
+  if (appState.cr.animId) {
+    cancelAnimationFrame(appState.cr.animId);
+    appState.cr.animId = null;
   }
+  appState.cr.animId = requestAnimationFrame(crashLoop);
   if (!crashTabsBound) {
     document.getElementById("crTabOnline")?.addEventListener("click", () => setCrashMode("online"));
     document.getElementById("crTabOffline")?.addEventListener("click", () => setCrashMode("offline"));
@@ -2173,13 +2245,14 @@ function startCrashRound() {
   updateBalanceUI(appState.balance - betVal);
 
   appState.cr.state = "countdown";
-  appState.cr.countdownDuration = 5.0;
+  appState.cr.countdownDuration = 2.0;
   appState.cr.countdownStart = performance.now();
-  appState.cr.lastTickSec = 5;
+  appState.cr.lastTickSec = 2;
   appState.cr.userCashedOut = false;
   appState.cr.userWonSum = 0;
   appState.cr.userWonMult = 0;
   appState.cr.zoomOffset = 0;
+  appState.cr.particles = [];
 
   audio.play("tick");
   triggerHaptic("light");
@@ -2190,6 +2263,8 @@ function cancelCrashCountdown() {
   audio.play("click");
   updateBalanceUI(appState.balance + appState.cr.bet);
   appState.cr.state = "idle";
+  appState.cr.particles = [];
+  appState.cr.zoomOffset = 0;
 
   const actionBtn = document.getElementById("crashActionBtn");
   if (actionBtn) {
@@ -2217,25 +2292,19 @@ function generateOfflineCrashPoint() {
     if (r < 0.85) return Number((1.01 + Math.random() * 0.20).toFixed(2));
     return Number((1.20 + Math.random() * 0.35).toFixed(2));
   }
-  // Haqiqiy 1xBet Crash RNG taqsimoti (Mustaqil offline rejim)
+  // 1xBet Crash RNG taqsimoti
   const r = Math.random();
   if (r < 0.05) {
-    // 5% ehtimol bilan 1.00x da srazu portlaydi
     return 1.00;
   } else if (r < 0.25) {
-    // 20% ehtimol bilan 1.01x - 1.35x oralig'ida
     return Number((1.01 + Math.random() * 0.34).toFixed(2));
   } else if (r < 0.60) {
-    // 35% ehtimol bilan 1.35x - 2.50x oralig'ida
     return Number((1.35 + Math.random() * 1.15).toFixed(2));
   } else if (r < 0.85) {
-    // 25% ehtimol bilan 2.50x - 6.00x oralig'ida
     return Number((2.50 + Math.random() * 3.50).toFixed(2));
   } else if (r < 0.96) {
-    // 11% ehtimol bilan 6.00x - 20.00x oralig'ida
     return Number((6.00 + Math.random() * 14.00).toFixed(2));
   } else {
-    // 4% ehtimol bilan 20.00x - 100.00x gacha uzoq parvoz
     return Number((20.00 + Math.random() * 80.00).toFixed(2));
   }
 }
@@ -2247,6 +2316,8 @@ function launchCrashFlight() {
   appState.cr.state = "flying";
   appState.cr.startTime = performance.now();
   appState.cr.multiplier = 1.00;
+  appState.cr.particles = [];
+  appState.cr.zoomOffset = 0;
 
   appState.cr.crashPoint = generateOfflineCrashPoint();
 
@@ -2307,6 +2378,7 @@ let crResetTimer = null;
 async function endCrashRound(win) {
   appState.cr.state = "crashed";
   appState.cr.zoomOffset = 0;
+  appState.cr.particles = [];
 
   const multText = document.getElementById("crashMultText");
   const actionBtn = document.getElementById("crashActionBtn");

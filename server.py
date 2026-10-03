@@ -264,68 +264,9 @@ class AviatorLiveRoom:
         self.crash_point = 1.00
         self.history = [1.85, 2.40, 1.20, 5.12, 1.05, 3.10]
         self.bets = {}
-        self.simulated_users = [
-            {"user_id": 9901, "name": "Jasur Crypto", "username": "jasur_crypto"},
-            {"user_id": 9902, "name": "Azamat UZ", "username": "azamat_uz"},
-            {"user_id": 9903, "name": "Farrux Bek", "username": "farrux_77"},
-            {"user_id": 9904, "name": "Bekzod", "username": "bekzod_01"},
-            {"user_id": 9905, "name": "Malika", "username": "malika_star"},
-            {"user_id": 9906, "name": "Islom Trader", "username": "islom_trader"},
-            {"user_id": 9907, "name": "Otabek", "username": "otabek_uzb"},
-            {"user_id": 9908, "name": "Sardor WIN", "username": "sardor_winner"}
-        ]
-        self.populate_simulated_bets()
         self.running = True
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
-
-    def populate_simulated_bets(self):
-        real_db_users = database.get_recent_telegram_users(limit=25)
-        amounts = [2000, 5000, 10000, 25000, 50000, 100000]
-        
-        available = []
-        if real_db_users:
-            for ru in real_db_users:
-                uname = (ru.get("username") or "").strip()
-                fname = (ru.get("first_name") or "").strip()
-                if uname or fname:
-                    available.append({
-                        "user_id": ru["user_id"],
-                        "name": fname or uname,
-                        "username": uname
-                    })
-        
-        if len(available) < 4:
-            fallback = [
-                {"user_id": 9901, "name": "Jasur", "username": "jasur_crypto"},
-                {"user_id": 9902, "name": "Azamat", "username": "azamat_uzb"},
-                {"user_id": 9903, "name": "Farrux", "username": "farrux_bek"},
-                {"user_id": 9904, "name": "Bekzod", "username": "bekzod_01"},
-                {"user_id": 9905, "name": "Malika", "username": "malika_star"},
-                {"user_id": 9906, "name": "Islom", "username": "islom_trader"},
-                {"user_id": 9907, "name": "Otabek", "username": "otabek_77"}
-            ]
-            for fb in fallback:
-                if not any(a["user_id"] == fb["user_id"] for a in available):
-                    available.append(fb)
-                    
-        count = min(len(available), random.randint(4, 7))
-        picked = random.sample(available, count)
-        for u in picked:
-            target = round(random.uniform(1.20, 3.80), 2)
-            amt = random.choice(amounts)
-            self.bets[u["user_id"]] = {
-                "user_id": u["user_id"],
-                "name": u["name"],
-                "username": u["username"],
-                "bet": amt,
-                "target_mult": target,
-                "cashed_out": False,
-                "cashout_mult": 0.0,
-                "win": 0,
-                "status": "in_flight",
-                "is_real": False
-            }
 
     def _determine_crash_point(self) -> float:
         if database.get_aviator_rng_enabled():
@@ -384,14 +325,6 @@ class AviatorLiveRoom:
                     mult = round(1.0 + 0.08 * (dt ** 1.65), 2)
                     self.current_mult = mult
 
-                    for b in self.bets.values():
-                        if not b.get("is_real") and not b["cashed_out"]:
-                            if mult >= b.get("target_mult", 2.0):
-                                b["cashed_out"] = True
-                                b["cashout_mult"] = mult
-                                b["win"] = int(b["bet"] * mult)
-                                b["status"] = "won"
-
                     if mult >= self.crash_point:
                         self.phase = "crashed"
                         self.current_mult = self.crash_point
@@ -404,11 +337,10 @@ class AviatorLiveRoom:
                             if not b["cashed_out"]:
                                 b["status"] = "lost"
                                 b["win"] = 0
-                                if b.get("is_real"):
-                                    try:
-                                        database.record_game(uid, "aviator_online", b["bet"], 0, 0.0)
-                                    except Exception:
-                                        pass
+                                try:
+                                    database.record_game(uid, "aviator_online", b["bet"], 0, 0.0)
+                                except Exception:
+                                    pass
 
                 elif self.phase == "crashed":
                     if now >= self.phase_end_time:
@@ -419,13 +351,12 @@ class AviatorLiveRoom:
                         self.current_mult = 1.00
                         self.crash_point = 1.00
                         self.bets.clear()
-                        self.populate_simulated_bets()
 
     def place_bet(self, user_id: int, bet: int, name: str, username: str):
         with self.lock:
             if self.phase != "waiting":
                 return False, "Stavka qabul qilish vaqti tugadi! Samolyot uchmoqda."
-            if user_id in self.bets and self.bets[user_id].get("is_real"):
+            if user_id in self.bets:
                 return False, "Siz bu raundda allaqachon stavka qildingiz!"
             user = database.get_or_create_user(user_id)
             if user["balance"] < bet:
@@ -450,7 +381,7 @@ class AviatorLiveRoom:
         with self.lock:
             if self.phase != "waiting":
                 return False, "Samolyot havoga ko'tarilgan, stavkani bekor qilib bo'lmaydi!"
-            if user_id not in self.bets or not self.bets[user_id].get("is_real"):
+            if user_id not in self.bets:
                 return False, "Stavka topilmadi!"
             bet = self.bets[user_id]["bet"]
             del self.bets[user_id]
@@ -461,7 +392,7 @@ class AviatorLiveRoom:
         with self.lock:
             if self.phase != "flying":
                 return False, "Samolyot parvozda emas!"
-            if user_id not in self.bets or not self.bets[user_id].get("is_real"):
+            if user_id not in self.bets:
                 return False, "Faol stavka topilmadi!"
             b = self.bets[user_id]
             if b["cashed_out"]:
@@ -487,7 +418,7 @@ class AviatorLiveRoom:
             time_left = max(0.0, round(self.phase_end_time - now, 1)) if self.phase != "flying" else 0.0
             bets_list = list(self.bets.values())
             bets_list.sort(key=lambda b: (
-                0 if b["user_id"] == current_user_id else (1 if b.get("is_real") else 2),
+                0 if b["user_id"] == current_user_id else 1,
                 -b["bet"]
             ))
             return {
