@@ -4350,17 +4350,23 @@ function selectRouletteChoice(choice, label) {
   document.querySelectorAll(".rl-sub-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.choice === choice);
   });
+
+  const actionBtn = document.getElementById("rlActionBtn");
+  if (actionBtn && appState.rl.phase === "betting" && !appState.rl.myBetPlaced) {
+    actionBtn.className = "btn-crash-action btn-ready rl-action-main-btn";
+    actionBtn.textContent = `STAVKA QILISH (${label})`;
+  }
 }
 
 function drawRouletteWheel(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
   const cy = h / 2;
-  const outerR = Math.min(w, h) / 2 - 6;
-  const rimWidth = 14;
+  const outerR = Math.min(w, h) / 2 - 4;
+  const rimWidth = 12;
   const trackR = outerR - rimWidth;
-  const pocketOuterR = trackR - 12;
-  const pocketInnerR = pocketOuterR - 36;
+  const pocketOuterR = trackR - 10;
+  const pocketInnerR = pocketOuterR - 30;
   const coneR = pocketInnerR - 4;
 
   ctx.save();
@@ -4374,7 +4380,7 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
   ctx.fillStyle = rimGrad;
   ctx.fill();
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.5;
   ctx.strokeStyle = "#ffd700";
   ctx.stroke();
 
@@ -4387,8 +4393,8 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.arc(cx, cy, trackR, 0, Math.PI * 2);
   ctx.fillStyle = trackGrad;
   ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "rgba(255, 215, 0, 0.45)";
   ctx.stroke();
 
   // 3. 37 Pockets Ring
@@ -4412,7 +4418,7 @@ function drawRouletteWheel(ctx, w, h) {
     ctx.closePath();
     ctx.fillStyle = fill;
     ctx.fill();
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 0.8;
     ctx.strokeStyle = "#ffd700";
     ctx.stroke();
 
@@ -4423,7 +4429,7 @@ function drawRouletteWheel(ctx, w, h) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 9.5px Oswald, Roboto, sans-serif";
+    ctx.font = "bold 8.5px Oswald, Roboto, sans-serif";
     ctx.fillText(num, (pocketOuterR + pocketInnerR) / 2, 0);
     ctx.restore();
   }
@@ -4431,13 +4437,13 @@ function drawRouletteWheel(ctx, w, h) {
   // Pocket boundary separator rings
   ctx.beginPath();
   ctx.arc(cx, cy, pocketOuterR, 0, Math.PI * 2);
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.5;
   ctx.strokeStyle = "#ffd700";
   ctx.stroke();
 
   ctx.beginPath();
   ctx.arc(cx, cy, pocketInnerR, 0, Math.PI * 2);
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.8;
   ctx.strokeStyle = "#ffd700";
   ctx.stroke();
 
@@ -4451,7 +4457,7 @@ function drawRouletteWheel(ctx, w, h) {
   ctx.arc(cx, cy, coneR, 0, Math.PI * 2);
   ctx.fillStyle = coneGrad;
   ctx.fill();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.8;
   ctx.strokeStyle = "#ffeaa7";
   ctx.stroke();
 
@@ -4460,22 +4466,22 @@ function drawRouletteWheel(ctx, w, h) {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(spA) * (coneR - 4), cy + Math.sin(spA) * (coneR - 4));
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(77, 50, 2, 0.6)";
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = "rgba(77, 50, 2, 0.65)";
     ctx.stroke();
   }
 
   // Center Brass Dome Cap
-  const capGrad = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 18);
+  const capGrad = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 16);
   capGrad.addColorStop(0, "#ffffff");
   capGrad.addColorStop(0.3, "#fff275");
   capGrad.addColorStop(0.8, "#d4a017");
   capGrad.addColorStop(1, "#543802");
   ctx.beginPath();
-  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 16, 0, Math.PI * 2);
   ctx.fillStyle = capGrad;
   ctx.fill();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.2;
   ctx.strokeStyle = "#ffffff";
   ctx.stroke();
 
@@ -4487,21 +4493,21 @@ function drawRouletteWheel(ctx, w, h) {
 
   // Ball shadow
   ctx.beginPath();
-  ctx.arc(bx + 2, by + 2, 6, 0, Math.PI * 2);
+  ctx.arc(bx + 2, by + 2, 5.5, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
   ctx.fill();
 
   // Ball sphere
-  const ballGrad = ctx.createRadialGradient(bx - 2, by - 2, 1, bx, by, 6.5);
+  const ballGrad = ctx.createRadialGradient(bx - 2, by - 2, 1, bx, by, 5.5);
   ballGrad.addColorStop(0, "#ffffff");
   ballGrad.addColorStop(0.65, "#ecf0f1");
   ballGrad.addColorStop(1, "#95a5a6");
   ctx.beginPath();
-  ctx.arc(bx, by, 6.5, 0, Math.PI * 2);
+  ctx.arc(bx, by, 5.5, 0, Math.PI * 2);
   ctx.fillStyle = ballGrad;
   ctx.fill();
   ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
   ctx.stroke();
 
   ctx.restore();
@@ -4520,8 +4526,11 @@ function rouletteLoop(timestamp) {
 
   const w = rouletteCanvas.width;
   const h = rouletteCanvas.height;
-  const trackR = Math.min(w, h) / 2 - 20;
-  const pocketR = trackR - 30;
+  const outerR = Math.min(w, h) / 2 - 4;
+  const trackR = outerR - 12;
+  const pocketOuterR = trackR - 10;
+  const pocketInnerR = pocketOuterR - 30;
+  const pocketR = (pocketOuterR + pocketInnerR) / 2;
 
   if (appState.rl.phase === "spinning") {
     const elapsed = Math.max(0, (performance.now() - (appState.rl.spinStartTime || performance.now())) / 1000);
@@ -4584,10 +4593,10 @@ function renderRouletteLiveBets(bets, currentUserBet) {
 
   if (safeBets.length === 0) {
     table.innerHTML = `
-      <div class="cr-empty-bets">
-        <div class="cr-empty-icon">👥</div>
-        <div class="cr-empty-title">Hozircha hech kim stavka qilmadi</div>
-        <div class="cr-empty-desc">Ushbu raundda birinchi bo'lib stavka qiling!</div>
+      <div class="rl-empty-state">
+        <div class="rl-empty-ico">🎰</div>
+        <div class="rl-empty-title">Ushbu raundda hali hech kim stavka qilmadi</div>
+        <div class="rl-empty-sub">Yuqoridagi tugma orqali birinchi bo'lib stavka qiling!</div>
       </div>
     `;
     return;
@@ -4597,31 +4606,40 @@ function renderRouletteLiveBets(bets, currentUserBet) {
     const isMe = b.user_id === USER_ID;
     const initial = (b.name || "O")[0].toUpperCase();
     const uname = b.username ? `@${b.username}` : (b.name || "O'yinchi");
-    let rowClass = "cf-bet-row cr-bet-row";
-    let badgeHtml = "";
 
+    let chipClass = "chip-other";
+    const ch = (b.choice || "").toLowerCase();
+    if (ch === "red" || ch.includes("qizil")) chipClass = "chip-red";
+    else if (ch === "black" || ch.includes("qora")) chipClass = "chip-black";
+    else if (ch === "0" || ch === "zero") chipClass = "chip-green";
+
+    let rowClass = "rl-1xb-row";
+    let statusHtml = "";
     if (b.status === "won") {
-      rowClass += " winner";
-      badgeHtml = `<span class="cf-p-badge win">+${formatMoney(b.win)} UZS (${(b.multiplier || 2).toFixed(1)}x)</span>`;
+      rowClass += " won";
+      statusHtml = `<span class="rl-status-won">+${formatMoney(b.win)} UZS (${(b.multiplier || 2).toFixed(1)}x)</span>`;
     } else if (b.status === "lost") {
-      rowClass += " loser";
-      badgeHtml = `<span class="cf-p-badge lose">-${formatMoney(b.bet)} UZS</span>`;
+      statusHtml = `<span class="rl-status-lost">-${formatMoney(b.bet)} UZS</span>`;
     } else {
-      badgeHtml = `<span class="cf-p-badge pending">${b.choice_label || b.choice}</span>`;
+      statusHtml = `<span class="rl-status-waiting">⏳ Kutilmoqda</span>`;
     }
 
     if (isMe) rowClass += " me";
 
     return `
       <div class="${rowClass}">
-        <div class="cf-p-info">
-          <div class="cf-p-avatar">${initial}</div>
-          <span class="cf-p-name">${isMe ? '⭐ Siz' : uname}</span>
+        <div class="u-info">
+          <div class="u-avatar ${isMe ? 'me-avatar' : ''}">${initial}</div>
+          <div class="u-names">
+            <span class="u-name">${uname}</span>
+            ${isMe ? '<span class="u-you-tag">★ SIZ</span>' : ''}
+          </div>
         </div>
-        <div class="cf-p-right" style="display:flex;align-items:center;gap:6px;">
-          <span class="cf-p-amount">${formatMoney(b.bet)} UZS</span>
-          ${badgeHtml}
+        <div>
+          <span class="rl-bet-badge ${chipClass}">${b.choice_label || b.choice}</span>
         </div>
+        <div class="rl-bet-amt">${formatMoney(b.bet)} UZS</div>
+        <div>${statusHtml}</div>
       </div>
     `;
   }).join("");
@@ -4684,11 +4702,11 @@ async function fetchRouletteStatus() {
 
       if (actionBtn) {
         if (data.user_bet) {
-          actionBtn.className = "btn-crash-action btn-danger-mode";
+          actionBtn.className = "btn-crash-action btn-danger-mode rl-action-main-btn";
           actionBtn.textContent = `STAVKANI BEKOR QILISH (-${formatMoney(data.user_bet.bet)} UZS)`;
         } else {
-          actionBtn.className = "btn-play-game";
-          actionBtn.textContent = "STAVKA QILISH (ONLINE)";
+          actionBtn.className = "btn-crash-action btn-ready rl-action-main-btn";
+          actionBtn.textContent = `STAVKA QILISH (${appState.rl.selectedLabel || "ONLINE"})`;
         }
       }
     } else if (data.phase === "spinning") {
@@ -4704,7 +4722,7 @@ async function fetchRouletteStatus() {
       if (phaseText) phaseText.textContent = "G'ILDIRAK AYLANMOQDA";
 
       if (actionBtn) {
-        actionBtn.className = "btn-crash-action btn-cashed-mode";
+        actionBtn.className = "btn-crash-action btn-cashed-mode rl-action-main-btn";
         actionBtn.textContent = "G'ILDIRAK AYLANMOQDA... 🎡";
       }
     } else if (data.phase === "result") {
@@ -4747,10 +4765,10 @@ async function fetchRouletteStatus() {
 
       if (actionBtn) {
         if (data.user_bet && data.user_bet.status === "won") {
-          actionBtn.className = "btn-crash-action btn-cashout-mode";
+          actionBtn.className = "btn-crash-action btn-cashout-mode rl-action-main-btn";
           actionBtn.textContent = `YUTUQ: +${formatMoney(data.user_bet.win)} UZS 🎉`;
         } else {
-          actionBtn.className = "btn-play-game";
+          actionBtn.className = "btn-crash-action btn-ready rl-action-main-btn";
           actionBtn.textContent = "KEYINGI RAUND KUTILMOQDA...";
         }
       }
@@ -4805,7 +4823,7 @@ document.getElementById("rlMax")?.addEventListener("click", () => {
   adjustBetInput("rlBetInput", "max");
 });
 
-document.querySelectorAll("#rlBettingBox .b-chip").forEach(chip => {
+document.querySelectorAll(".rl-bet-controller .b-chip, .rl-chips-row .b-chip, #rlBettingBox .b-chip").forEach(chip => {
   chip.addEventListener("click", () => {
     const val = parseInt(chip.getAttribute("data-v"), 10);
     setBetChip("rlBetInput", val);
