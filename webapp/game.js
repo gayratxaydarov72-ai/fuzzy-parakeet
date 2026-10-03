@@ -69,7 +69,7 @@ const KAMIKAZE_ODDS = {
   3: [2.45, 6.12, 15.31, 38.28, 95.70, 239.25, 598.14, 1495.37, 3738.44, 9346.10]
 };
 
-const APPLE_ODDS = [1.93, 3.75, 7.20, 13.80, 26.50, 51.00, 98.00, 188.00, 360.00, 700.00];
+const APPLE_ODDS = [1.23, 1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.96, 69.90, 349.50];
 
 const appState = {
   balance: 10000,
@@ -635,7 +635,7 @@ function updateBalanceUI(val, animate = true) {
 
   const start = prev;
   const startTime = performance.now();
-  const dur = 400;
+  const dur = 650;
 
   function step(now) {
     const p = Math.min((now - startTime) / dur, 1);
@@ -1976,7 +1976,7 @@ function crashLoop(now) {
     let currentMult = 1.00;
     if (appState.cr.mode === "online") {
       const elapsed = Math.max(0, (now - (appState.cr.flightStartTime || now)) / 1000);
-      const simulated = Math.max(1.00, 1.00 + 0.08 * Math.pow(elapsed, 1.65));
+      const simulated = Math.max(1.00, Math.exp(0.06 * elapsed));
       const target = Math.max(simulated, appState.cr.targetMultiplier || 1.00);
       appState.cr.multiplier += (target - appState.cr.multiplier) * 0.15;
       currentMult = appState.cr.multiplier;
@@ -1993,7 +1993,7 @@ function crashLoop(now) {
       }
     } else {
       const elapsed = Math.max(0, (now - appState.cr.startTime) / 1000);
-      currentMult = Math.max(1.00, 1.00 + 0.08 * Math.pow(elapsed, 1.65));
+      currentMult = Math.max(1.00, Math.exp(0.06 * elapsed));
       appState.cr.multiplier = currentMult;
 
       if (multText) {

@@ -9,6 +9,7 @@ import threading
 from collections import defaultdict
 import urllib.parse
 import random
+import math
 from datetime import datetime, timedelta, time as dt_time
 import database
 
@@ -321,8 +322,8 @@ class AviatorLiveRoom:
                             b["win"] = 0
 
                 elif self.phase == "flying":
-                    dt = now - self.flight_start_time
-                    mult = round(1.0 + 0.08 * (dt ** 1.65), 2)
+                    dt = max(0.0, now - self.flight_start_time)
+                    mult = round(math.exp(0.06 * dt), 2)
                     self.current_mult = mult
 
                     if mult >= self.crash_point:
