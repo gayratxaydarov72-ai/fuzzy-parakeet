@@ -1739,125 +1739,131 @@ function initCrashCanvas() {
 }
 
 function drawAviatorPlane(ctx, x, y, angle, isCrashed, time) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
+  try {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
 
-  if (!isCrashed) {
-    // Jet Engine Afterburner Flame
-    const flicker1 = Math.sin(time * 45) * 5;
-    const flicker2 = Math.cos(time * 38) * 4;
-    const flameLen = 22 + flicker1;
+    if (!isCrashed) {
+      // Jet Engine Afterburner Flame
+      const flicker1 = Math.sin(time * 45) * 4;
+      const flicker2 = Math.cos(time * 38) * 3;
+      const flameLen = 22 + flicker1;
 
-    const flameGrad = ctx.createLinearGradient(-flameLen - 12, 0, -10, 0);
-    flameGrad.addColorStop(0, "rgba(255, 69, 0, 0)");
-    flameGrad.addColorStop(0.3, "rgba(255, 120, 0, 0.75)");
-    flameGrad.addColorStop(0.7, "rgba(255, 220, 0, 0.95)");
-    flameGrad.addColorStop(1, "rgba(0, 240, 255, 1)");
+      const flameGrad = ctx.createLinearGradient(-flameLen - 12, 0, -10, 0);
+      flameGrad.addColorStop(0, "rgba(255, 69, 0, 0)");
+      flameGrad.addColorStop(0.3, "rgba(255, 120, 0, 0.75)");
+      flameGrad.addColorStop(0.7, "rgba(255, 220, 0, 0.95)");
+      flameGrad.addColorStop(1, "rgba(0, 240, 255, 1)");
 
-    ctx.fillStyle = flameGrad;
+      ctx.fillStyle = flameGrad;
+      ctx.beginPath();
+      ctx.moveTo(-10, -5);
+      ctx.lineTo(-flameLen - 12, -2 + flicker2 * 0.4);
+      ctx.lineTo(-10, 5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Hot inner flame core
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(-10, -2);
+      ctx.lineTo(-flameLen * 0.5 - 10, 0);
+      ctx.lineTo(-10, 2);
+      ctx.closePath();
+      ctx.fill();
+
+      // Supersonic Mach Shock Rings (safe radii)
+      const shockPulse = Math.abs((time * 8) % 1);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${Math.max(0, 0.4 * (1 - shockPulse))})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const rx = Math.max(1, 4 + shockPulse * 6);
+      const ry = Math.max(1, 8 + shockPulse * 10);
+      ctx.ellipse(-18 - shockPulse * 16, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Red Fuselage Body
+    ctx.fillStyle = "#e02020";
     ctx.beginPath();
-    ctx.moveTo(-10, -5);
-    ctx.lineTo(-flameLen - 12, -2 + flicker2 * 0.4);
-    ctx.lineTo(-10, 5);
+    ctx.moveTo(30, 0);
+    ctx.lineTo(8, -7);
+    ctx.lineTo(-18, -6);
+    ctx.lineTo(-24, -3);
+    ctx.lineTo(-24, 3);
+    ctx.lineTo(-18, 6);
+    ctx.lineTo(8, 7);
     ctx.closePath();
     ctx.fill();
 
-    // Hot inner flame core
+    // White Speed Stripe
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.moveTo(-10, -2);
-    ctx.lineTo(-flameLen * 0.5 - 10, 0);
-    ctx.lineTo(-10, 2);
+    ctx.moveTo(28, 0);
+    ctx.lineTo(6, 1.5);
+    ctx.lineTo(-16, 1.5);
+    ctx.lineTo(-16, 0);
     ctx.closePath();
     ctx.fill();
 
-    // Supersonic Mach Shock Rings
-    const shockPulse = (time * 8) % 1;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 * (1 - shockPulse)})`;
-    ctx.lineWidth = 1.5;
+    // Main Wing Top
+    ctx.fillStyle = "#a81313";
     ctx.beginPath();
-    ctx.ellipse(-18 - shockPulse * 16, 0, 4 + shockPulse * 6, 8 + shockPulse * 10, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.moveTo(6, -6);
+    ctx.lineTo(-10, -26);
+    ctx.lineTo(-18, -26);
+    ctx.lineTo(-8, -6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wing Tip White Decal
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.moveTo(-10, -26);
+    ctx.lineTo(-18, -26);
+    ctx.lineTo(-16, -22);
+    ctx.lineTo(-8, -22);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wing Bottom
+    ctx.fillStyle = "#7a0c0c";
+    ctx.beginPath();
+    ctx.moveTo(4, 6);
+    ctx.lineTo(-8, 18);
+    ctx.lineTo(-15, 18);
+    ctx.lineTo(-6, 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tail Fin
+    ctx.fillStyle = "#b81616";
+    ctx.beginPath();
+    ctx.moveTo(-14, -5);
+    ctx.lineTo(-24, -16);
+    ctx.lineTo(-28, -16);
+    ctx.lineTo(-22, -5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cockpit Tinted Canopy Glass
+    const canopyGrad = ctx.createLinearGradient(8, -6, 20, 0);
+    canopyGrad.addColorStop(0, "rgba(0, 240, 255, 0.9)");
+    canopyGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.95)");
+    canopyGrad.addColorStop(1, "rgba(10, 50, 90, 0.8)");
+    ctx.fillStyle = canopyGrad;
+    ctx.beginPath();
+    ctx.moveTo(10, -5);
+    ctx.lineTo(20, -1);
+    ctx.lineTo(8, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  } catch (err) {
+    try { ctx.restore(); } catch (e) {}
   }
-
-  // Red Fuselage Body
-  ctx.fillStyle = "#e02020";
-  ctx.beginPath();
-  ctx.moveTo(30, 0);
-  ctx.lineTo(8, -7);
-  ctx.lineTo(-18, -6);
-  ctx.lineTo(-24, -3);
-  ctx.lineTo(-24, 3);
-  ctx.lineTo(-18, 6);
-  ctx.lineTo(8, 7);
-  ctx.closePath();
-  ctx.fill();
-
-  // White Speed Stripe
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.moveTo(28, 0);
-  ctx.lineTo(6, 1.5);
-  ctx.lineTo(-16, 1.5);
-  ctx.lineTo(-16, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  // Main Wing Top
-  ctx.fillStyle = "#a81313";
-  ctx.beginPath();
-  ctx.moveTo(6, -6);
-  ctx.lineTo(-10, -26);
-  ctx.lineTo(-18, -26);
-  ctx.lineTo(-8, -6);
-  ctx.closePath();
-  ctx.fill();
-
-  // Wing Tip White Decal
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.moveTo(-10, -26);
-  ctx.lineTo(-18, -26);
-  ctx.lineTo(-16, -22);
-  ctx.lineTo(-8, -22);
-  ctx.closePath();
-  ctx.fill();
-
-  // Wing Bottom
-  ctx.fillStyle = "#7a0c0c";
-  ctx.beginPath();
-  ctx.moveTo(4, 6);
-  ctx.lineTo(-8, 18);
-  ctx.lineTo(-15, 18);
-  ctx.lineTo(-6, 6);
-  ctx.closePath();
-  ctx.fill();
-
-  // Tail Fin
-  ctx.fillStyle = "#b81616";
-  ctx.beginPath();
-  ctx.moveTo(-14, -5);
-  ctx.lineTo(-24, -16);
-  ctx.lineTo(-28, -16);
-  ctx.lineTo(-22, -5);
-  ctx.closePath();
-  ctx.fill();
-
-  // Cockpit Tinted Canopy Glass
-  const canopyGrad = ctx.createLinearGradient(8, -6, 20, 0);
-  canopyGrad.addColorStop(0, "rgba(0, 240, 255, 0.9)");
-  canopyGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.95)");
-  canopyGrad.addColorStop(1, "rgba(10, 50, 90, 0.8)");
-  ctx.fillStyle = canopyGrad;
-  ctx.beginPath();
-  ctx.moveTo(10, -5);
-  ctx.lineTo(20, -1);
-  ctx.lineTo(8, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
 }
 
 function drawCrashGrid(w, h) {
@@ -1936,7 +1942,7 @@ function crashLoop(now) {
       actionBtn.textContent = `BEKOR QILISH (${remaining.toFixed(1)}s)`;
     }
 
-    const planeY = (h - 30) - 10 + Math.sin(now * 0.02) * 1.5;
+    const planeY = (h - 30) - 10 + Math.sin(now * 0.0035) * 2;
     drawAviatorPlane(crashCtx, 60, planeY, 0, false, now * 0.001);
 
     const centerX = w / 2;
@@ -1974,119 +1980,123 @@ function crashLoop(now) {
   } else if (appState.cr.state === "flying") {
     if (multText) multText.style.display = "block";
     let currentMult = 1.00;
-    if (appState.cr.mode === "online") {
-      const elapsed = Math.max(0, (now - (appState.cr.flightStartTime || now)) / 1000);
-      const simulated = Math.max(1.00, Math.exp(0.06 * elapsed));
-      const target = Math.max(simulated, appState.cr.targetMultiplier || 1.00);
-      appState.cr.multiplier += (target - appState.cr.multiplier) * 0.15;
-      currentMult = appState.cr.multiplier;
 
-      if (multText) {
-        multText.className = "crash-multiplier-center";
-        multText.textContent = `${currentMult.toFixed(2)}x`;
-      }
+    const elapsed = appState.cr.mode === "online"
+      ? Math.max(0, (now - (appState.cr.flightStartTime || now)) / 1000)
+      : Math.max(0, (now - appState.cr.startTime) / 1000);
 
-      if (actionBtn && appState.cr.myBetPlaced && !appState.cr.userCashedOut) {
-        const curWin = Math.floor(appState.cr.myBetAmount * currentMult);
-        actionBtn.className = "btn-crash-action btn-cashout-mode";
-        actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
-      }
-    } else {
-      const elapsed = Math.max(0, (now - appState.cr.startTime) / 1000);
-      currentMult = Math.max(1.00, Math.exp(0.06 * elapsed));
-      appState.cr.multiplier = currentMult;
+    currentMult = Math.max(1.00, Math.exp(0.06 * elapsed));
+    appState.cr.multiplier = currentMult;
 
-      if (multText) {
-        multText.className = "crash-multiplier-center";
-        multText.textContent = `${currentMult.toFixed(2)}x`;
-      }
+    if (multText) {
+      multText.className = "crash-multiplier-center";
+      multText.textContent = `${currentMult.toFixed(2)}x`;
+    }
 
-      if (actionBtn && !appState.cr.userCashedOut) {
-        const curWin = Math.floor(appState.cr.bet * currentMult);
-        actionBtn.className = "btn-crash-action btn-cashout-mode";
-        actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
+    if (actionBtn) {
+      if (appState.cr.mode === "online") {
+        if (appState.cr.myBetPlaced && !appState.cr.userCashedOut) {
+          const curWin = Math.floor(appState.cr.myBetAmount * currentMult);
+          actionBtn.className = "btn-crash-action btn-cashout-mode";
+          actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
+        } else if (appState.cr.myBetPlaced && appState.cr.userCashedOut) {
+          actionBtn.className = "btn-crash-action btn-cashed-mode";
+          actionBtn.textContent = `YUTUQ OLINDI! (+${formatMoney(appState.cr.userWonSum || 0)} UZS)`;
+        }
+      } else {
+        if (!appState.cr.userCashedOut) {
+          const curWin = Math.floor(appState.cr.bet * currentMult);
+          actionBtn.className = "btn-crash-action btn-cashout-mode";
+          actionBtn.textContent = `YUTUQNI OLISH (${formatMoney(curWin)} UZS)`;
+        }
       }
     }
 
+    // Continuous, buttery-smooth aerodynamic flight path
     const x0 = 35;
     const y0 = h - 30;
-    const targetX = w * 0.72;
-    const targetY = h * 0.28;
+    const maxX = w * 0.76;
+    const minY = h * 0.22;
 
-    let px, py, angle;
-    if (currentMult <= 2.5) {
-      const p = Math.min(1.0, (currentMult - 1.0) / 1.5);
-      px = x0 + (targetX - x0) * p;
-      py = y0 - (y0 - targetY) * Math.pow(p, 1.25);
-      angle = -0.38 + 0.12 * p;
-    } else {
-      px = targetX + Math.sin(now * 0.0022) * (w * 0.05);
-      py = targetY + Math.cos(now * 0.0026) * 10;
-      angle = -0.26 + Math.sin(now * 0.0022) * 0.06;
-    }
+    const progress = Math.min(1.0, 1.0 - Math.exp(-0.075 * elapsed));
+    const px = x0 + (maxX - x0) * progress;
+    const baseY = y0 - (y0 - minY) * Math.pow(progress, 0.82);
+    const floatOffset = Math.sin(now * 0.0028) * 3.5 * progress;
+    const py = baseY + floatOffset;
+
+    const climbAngle = -0.42 + 0.18 * progress;
+    const floatAngle = Math.cos(now * 0.0028) * 0.03 * progress;
+    const angle = climbAngle + floatAngle;
 
     appState.cr.lastPlaneX = px;
     appState.cr.lastPlaneY = py;
     appState.cr.lastPlaneAngle = angle;
 
-    // Soft gradient below trajectory
+    const cpx = x0 + (px - x0) * 0.52;
+    const cpy = y0;
+
+    // Glowing gradient below trajectory
     const grad = crashCtx.createLinearGradient(0, py, 0, y0);
-    grad.addColorStop(0, "rgba(255, 71, 87, 0.35)");
-    grad.addColorStop(0.6, "rgba(255, 71, 87, 0.08)");
+    grad.addColorStop(0, "rgba(255, 71, 87, 0.32)");
+    grad.addColorStop(0.65, "rgba(255, 71, 87, 0.06)");
     grad.addColorStop(1, "rgba(255, 71, 87, 0.0)");
 
     crashCtx.beginPath();
     crashCtx.moveTo(x0, y0);
-    crashCtx.quadraticCurveTo(px * 0.45, y0, px, py);
+    crashCtx.quadraticCurveTo(cpx, cpy, px, py);
     crashCtx.lineTo(px, y0);
     crashCtx.closePath();
     crashCtx.fillStyle = grad;
     crashCtx.fill();
 
-    // High performance neon glowing line (zero shadowBlur lag)
+    // Laser glowing trajectory line
     crashCtx.beginPath();
     crashCtx.moveTo(x0, y0);
-    crashCtx.quadraticCurveTo(px * 0.45, y0, px, py);
-    crashCtx.lineWidth = 7;
+    crashCtx.quadraticCurveTo(cpx, cpy, px, py);
+    crashCtx.lineWidth = 5;
     crashCtx.strokeStyle = "rgba(255, 71, 87, 0.25)";
     crashCtx.stroke();
 
-    crashCtx.lineWidth = 3.5;
+    crashCtx.lineWidth = 2.5;
     crashCtx.strokeStyle = "#ff4757";
     crashCtx.stroke();
 
-    // Hardware-accelerated additive exhaust particles (max 35 cap)
+    // High performance exhaust particles
     if (!appState.cr.particles) appState.cr.particles = [];
-    if (appState.cr.particles.length < 35) {
+    if (appState.cr.particles.length < 18) {
+      const exX = px - 20 * Math.cos(angle);
+      const exY = py - 20 * Math.sin(angle);
       appState.cr.particles.push({
-        x: px - 20 * Math.cos(angle),
-        y: py - 20 * Math.sin(angle),
-        vx: -Math.cos(angle) * (3.5 + Math.random() * 2.5) + (Math.random() - 0.5) * 1.5,
-        vy: -Math.sin(angle) * (3.5 + Math.random() * 2.5) + (Math.random() - 0.5) * 1.5,
-        r: 2.2 + Math.random() * 2.5,
-        color: Math.random() < 0.5 ? "rgba(255, 71, 87, " : (Math.random() < 0.8 ? "rgba(255, 165, 2, " : "rgba(255, 255, 255, "),
-        alpha: 0.9,
-        decay: 0.04 + Math.random() * 0.03
+        x: exX,
+        y: exY,
+        vx: -Math.cos(angle) * (3.0 + Math.random() * 2.0) + (Math.random() - 0.5) * 1.0,
+        vy: -Math.sin(angle) * (3.0 + Math.random() * 2.0) + (Math.random() - 0.5) * 1.0,
+        r: 2.0 + Math.random() * 2.0,
+        alpha: 0.85,
+        decay: 0.045 + Math.random() * 0.02
       });
     }
 
-    crashCtx.save();
-    crashCtx.globalCompositeOperation = "lighter";
-    for (let i = appState.cr.particles.length - 1; i >= 0; i--) {
-      const pt = appState.cr.particles[i];
-      pt.x += pt.vx;
-      pt.y += pt.vy;
-      pt.alpha -= pt.decay;
-      if (pt.alpha <= 0) {
-        appState.cr.particles.splice(i, 1);
-        continue;
+    if (appState.cr.particles.length > 0) {
+      crashCtx.save();
+      crashCtx.globalCompositeOperation = "lighter";
+      crashCtx.fillStyle = "#ff6348";
+      for (let i = appState.cr.particles.length - 1; i >= 0; i--) {
+        const pt = appState.cr.particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.alpha -= pt.decay;
+        if (pt.alpha <= 0) {
+          appState.cr.particles.splice(i, 1);
+          continue;
+        }
+        crashCtx.globalAlpha = Math.max(0, Math.min(1, pt.alpha));
+        crashCtx.beginPath();
+        crashCtx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        crashCtx.fill();
       }
-      crashCtx.fillStyle = pt.color + pt.alpha + ")";
-      crashCtx.beginPath();
-      crashCtx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
-      crashCtx.fill();
+      crashCtx.restore();
     }
-    crashCtx.restore();
 
     drawAviatorPlane(crashCtx, px, py, angle, false, now * 0.001);
 
@@ -2099,24 +2109,26 @@ function crashLoop(now) {
     const y0 = h - 30;
     const px = appState.cr.lastPlaneX || (w * 0.70);
     const py = appState.cr.lastPlaneY || (h * 0.30);
+    const cpx = x0 + (px - x0) * 0.52;
+    const cpy = y0;
 
     // Dashed trajectory of completed flight
     crashCtx.save();
     crashCtx.setLineDash([5, 5]);
     crashCtx.beginPath();
     crashCtx.moveTo(x0, y0);
-    crashCtx.quadraticCurveTo(px * 0.45, y0, px, py);
-    crashCtx.lineWidth = 2.5;
-    crashCtx.strokeStyle = "rgba(231, 76, 60, 0.45)";
+    crashCtx.quadraticCurveTo(cpx, cpy, px, py);
+    crashCtx.lineWidth = 2;
+    crashCtx.strokeStyle = "rgba(231, 76, 60, 0.4)";
     crashCtx.stroke();
     crashCtx.restore();
 
-    appState.cr.zoomOffset = (appState.cr.zoomOffset || 0) + 12;
+    appState.cr.zoomOffset = (appState.cr.zoomOffset || 0) + 14;
     const flyX = px + appState.cr.zoomOffset;
-    const flyY = py - appState.cr.zoomOffset * 0.75;
+    const flyY = py - appState.cr.zoomOffset * 0.85;
 
-    if (flyX < w + 80 && flyY > -80) {
-      drawAviatorPlane(crashCtx, flyX, flyY, -0.65, true, now * 0.001);
+    if (flyX < w + 100 && flyY > -100) {
+      drawAviatorPlane(crashCtx, flyX, flyY, -0.72, true, now * 0.001);
     }
   }
 
@@ -2264,13 +2276,21 @@ async function fetchAviatorOnlineStatus() {
         }
       }
     } else if (data.phase === "flying") {
+      const serverNow = typeof data.server_time === "number" ? data.server_time : (Date.now() / 1000);
+      const serverStart = typeof data.flight_start_time === "number" ? data.flight_start_time : serverNow;
+      const serverElapsed = Math.max(0, serverNow - serverStart);
+      const targetFlightStartTime = performance.now() - (serverElapsed * 1000);
+
       if (appState.cr.state !== "flying") {
         appState.cr.state = "flying";
-        appState.cr.flightStartTime = performance.now();
+        appState.cr.flightStartTime = targetFlightStartTime;
         audio.play("takeoff");
         triggerHaptic("medium");
         appState.cr.particles = [];
         appState.cr.zoomOffset = 0;
+      } else if (Math.abs((appState.cr.flightStartTime || 0) - targetFlightStartTime) > 600) {
+        // Soft sync if clock drift exceeds 600ms without abrupt jumping
+        appState.cr.flightStartTime += (targetFlightStartTime - appState.cr.flightStartTime) * 0.15;
       }
       appState.cr.targetMultiplier = data.multiplier;
       appState.cr.crashPoint = data.crash_point;
