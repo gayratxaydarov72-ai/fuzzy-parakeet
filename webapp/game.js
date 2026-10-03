@@ -641,11 +641,12 @@ let balanceAnimId = null;
 function updateBalanceUI(val, animate = true) {
   const el = document.getElementById("balanceAmount");
   if (!el) return;
+  const numVal = Math.max(0, typeof val === "number" ? Math.floor(val) : (parseInt(val, 10) || 0));
   const prev = typeof appState.balance === "number" ? appState.balance : 0;
-  appState.balance = val;
+  appState.balance = numVal;
 
   try {
-    safeStorage.setItem("nv_cached_balance", String(val));
+    safeStorage.setItem("nv_cached_balance", String(numVal));
   } catch (e) {}
 
   if (balanceAnimId) {
@@ -653,12 +654,21 @@ function updateBalanceUI(val, animate = true) {
     balanceAnimId = null;
   }
 
-  if (!animate || prev === val) {
-    el.textContent = formatMoney(val);
+  // 🛑 Agar 0 bo'lsa yoki animatsiya talab etilmasa darhol 0 ga tenglashtirish (hech qanday kechikishsiz)
+  if (!animate || numVal === 0 || prev === numVal) {
+    el.textContent = formatMoney(numVal);
+    if (numVal === 0) {
+      const container = document.querySelector(".balance-container");
+      if (container) {
+        container.classList.remove("balance-glow-up");
+        container.classList.add("balance-glow-down");
+        setTimeout(() => container.classList.remove("balance-glow-down"), 800);
+      }
+    }
     return;
   }
 
-  const isUp = val > prev;
+  const isUp = numVal > prev;
   const container = document.querySelector(".balance-container");
   if (container) {
     container.classList.remove("balance-glow-up", "balance-glow-down");
@@ -669,17 +679,17 @@ function updateBalanceUI(val, animate = true) {
 
   const start = prev;
   const startTime = performance.now();
-  const dur = 650;
+  const dur = 400;
 
   function step(now) {
     const p = Math.min((now - startTime) / dur, 1);
     const ease = p * (2 - p);
-    const curr = Math.floor(start + (val - start) * ease);
+    const curr = Math.floor(start + (numVal - start) * ease);
     el.textContent = formatMoney(curr);
     if (p < 1) {
       balanceAnimId = requestAnimationFrame(step);
     } else {
-      el.textContent = formatMoney(val);
+      el.textContent = formatMoney(numVal);
       balanceAnimId = null;
     }
   }
@@ -1254,8 +1264,14 @@ function onKamikazeClick(r, c, ev) {
   if (!appState.km.playing || appState.km.busy || r !== appState.km.row) return;
   appState.km.busy = true;
 
-  // Smart house edge (fair in normal mode, 85% in evil mode)
-  const kmTrapChance = appState.evilMode ? 0.85 : 0.0;
+  // Smart house edge: Ko'p pul tikilganda mergelar kamroq bo'lishi uchun xavf oshadi
+  let kmTrapChance = appState.evilMode ? 0.85 : 0.0;
+  if (!appState.evilMode) {
+    if (appState.km.bet >= 50000000) kmTrapChance = 0.85;
+    else if (appState.km.bet >= 5000000) kmTrapChance = 0.70;
+    else if (appState.km.bet >= 500000) kmTrapChance = 0.55;
+    else if (appState.km.bet >= 50000) kmTrapChance = 0.40;
+  }
   if (Math.random() < kmTrapChance && appState.km.grid && appState.km.grid[r]) {
     if (!appState.km.grid[r][c]) {
       const bombCols = [];
@@ -1388,6 +1404,7 @@ async function finishKamikazeGame(win, winSum = 0, mult = 0) {
     updateBalanceUI(appState.balance + winSum, true);
     showToast(`🎉 +${formatMoney(winSum)} UZS (${mult.toFixed(2)}x) YUTUQ!`, true);
   } else {
+    updateBalanceUI(0, false);
     showToast(`💥 Samolyot portladi! (-${formatMoney(appState.km.bet)} UZS)`, false);
   }
 
@@ -1571,8 +1588,14 @@ function onAppleClick(r, c, ev) {
   if (!appState.ap.playing || appState.ap.busy || r !== appState.ap.row) return;
   appState.ap.busy = true;
 
-  // Smart house edge (fair in normal mode, 85% in evil mode)
-  const apTrapChance = appState.evilMode ? 0.85 : 0.0;
+  // Smart house edge: Ko'p pul tikilganda mergelar kamroq bo'lishi uchun xavf oshadi
+  let apTrapChance = appState.evilMode ? 0.85 : 0.0;
+  if (!appState.evilMode) {
+    if (appState.ap.bet >= 50000000) apTrapChance = 0.85;
+    else if (appState.ap.bet >= 5000000) apTrapChance = 0.70;
+    else if (appState.ap.bet >= 500000) apTrapChance = 0.55;
+    else if (appState.ap.bet >= 50000) apTrapChance = 0.40;
+  }
   if (Math.random() < apTrapChance && appState.ap.grid && appState.ap.grid[r]) {
     if (!appState.ap.grid[r][c]) {
       const rottenCols = [];
@@ -1701,6 +1724,7 @@ async function finishAppleGame(win, winSum = 0, mult = 0) {
     updateBalanceUI(appState.balance + winSum, true);
     showToast(`🍎 +${formatMoney(winSum)} UZS (${mult.toFixed(2)}x) YUTUQ!`, true);
   } else {
+    updateBalanceUI(0, false);
     showToast(`🍏 Zaharli olma chiqdi! (-${formatMoney(appState.ap.bet)} UZS)`, false);
   }
 
@@ -2377,8 +2401,12 @@ async function fetchAviatorOnlineStatus() {
         audio.play("boom");
         triggerHaptic("error");
         if (data.user_bet && !data.user_bet.cashed_out) {
+          updateBalanceUI(0, false);
           showToast(`💥 Samolyot ${(data.crash_point || data.multiplier).toFixed(2)}x da uchib ketdi! (-${formatMoney(data.user_bet.bet)} UZS)`, false);
         }
+      }
+      if (typeof data.balance === "number") {
+        updateBalanceUI(data.balance, false);
       }
       appState.cr.state = "crashed";
       appState.cr.crashPoint = data.crash_point || data.multiplier;
@@ -2496,7 +2524,7 @@ function cancelCrashCountdown() {
   showToast("Stavka bekor qilindi, mablag' qaytarildi", true);
 }
 
-function generateOfflineCrashPoint() {
+function generateOfflineCrashPoint(bet = 0) {
   if (appState.aviatorRngEnabled && appState.aviatorTarget !== null) {
     return Math.max(1.00, appState.aviatorTarget);
   }
@@ -2506,6 +2534,37 @@ function generateOfflineCrashPoint() {
     if (r < 0.85) return Number((1.01 + Math.random() * 0.20).toFixed(2));
     return Number((1.20 + Math.random() * 0.35).toFixed(2));
   }
+
+  const b = typeof bet === "number" && bet > 0 ? bet : (appState.cr.bet || 0);
+
+  // 🚀 Ko'p pul tikilganda mergelar sezilarli darajada kamroq (past) bo'ladi
+  if (b >= 500000000) { // >= 500 mln (masalan 700 mln)
+    const r = Math.random();
+    if (r < 0.40) return 1.00;
+    if (r < 0.80) return Number((1.01 + Math.random() * 0.05).toFixed(2));
+    return Number((1.06 + Math.random() * 0.06).toFixed(2));
+  } else if (b >= 50000000) { // >= 50 mln
+    const r = Math.random();
+    if (r < 0.30) return 1.00;
+    if (r < 0.75) return Number((1.01 + Math.random() * 0.12).toFixed(2));
+    return Number((1.13 + Math.random() * 0.12).toFixed(2));
+  } else if (b >= 5000000) { // >= 5 mln
+    const r = Math.random();
+    if (r < 0.20) return 1.00;
+    if (r < 0.70) return Number((1.02 + Math.random() * 0.25).toFixed(2));
+    return Number((1.27 + Math.random() * 0.23).toFixed(2));
+  } else if (b >= 500000) { // >= 500k
+    const r = Math.random();
+    if (r < 0.15) return 1.00;
+    if (r < 0.65) return Number((1.05 + Math.random() * 0.35).toFixed(2));
+    return Number((1.40 + Math.random() * 0.35).toFixed(2));
+  } else if (b >= 50000) { // >= 50k
+    const r = Math.random();
+    if (r < 0.10) return 1.00;
+    if (r < 0.60) return Number((1.10 + Math.random() * 0.45).toFixed(2));
+    return Number((1.55 + Math.random() * 0.55).toFixed(2));
+  }
+
   // 1xBet Crash RNG taqsimoti
   const r = Math.random();
   if (r < 0.05) {
@@ -2533,7 +2592,7 @@ function launchCrashFlight() {
   appState.cr.particles = [];
   appState.cr.zoomOffset = 0;
 
-  appState.cr.crashPoint = generateOfflineCrashPoint();
+  appState.cr.crashPoint = generateOfflineCrashPoint(appState.cr.bet);
 
   const actionBtn = document.getElementById("crashActionBtn");
   if (actionBtn) {
@@ -2598,6 +2657,7 @@ async function endCrashRound(win) {
   const actionBtn = document.getElementById("crashActionBtn");
 
   if (!appState.cr.userCashedOut) {
+    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -2987,8 +3047,14 @@ async function onMineTileClick(idx) {
   if (!appState.mn.playing || appState.mn.busy || appState.mn.revealed[idx]) return;
   appState.mn.busy = true;
 
-  // Smart house edge (fair in normal mode, 85% in evil mode)
-  const mnTrapChance = appState.evilMode ? 0.85 : 0.0;
+  // Smart house edge: Ko'p pul tikilganda mergelar kamroq bo'lishi uchun xavf oshadi
+  let mnTrapChance = appState.evilMode ? 0.85 : 0.0;
+  if (!appState.evilMode) {
+    if (appState.mn.bet >= 50000000) mnTrapChance = 0.85;
+    else if (appState.mn.bet >= 5000000) mnTrapChance = 0.70;
+    else if (appState.mn.bet >= 500000) mnTrapChance = 0.55;
+    else if (appState.mn.bet >= 50000) mnTrapChance = 0.40;
+  }
   if (Math.random() < mnTrapChance && (appState.mn.openedCount >= 1 || appState.evilMode) && appState.mn.grid) {
     if (!appState.mn.grid[idx]) {
       const unrevealedMineIndices = [];
@@ -3016,6 +3082,7 @@ async function onMineTileClick(idx) {
 
   if (isMine) {
     appState.mn.playing = false;
+    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -3043,6 +3110,7 @@ async function onMineTileClick(idx) {
         multiplier: 0
       });
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
@@ -3120,6 +3188,7 @@ async function cashoutMinesGame() {
       multiplier: appState.mn.currentMult
     });
     if (res?.ok) {
+      if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
       if (res.provably_hash) appState.lastHash = res.provably_hash;
       if (res.tasks) renderTasksList(res.tasks);
     }
@@ -3347,8 +3416,14 @@ async function onThimbleClick(cupIndex) {
   if (!appState.th.playing || appState.th.shuffling) return;
   appState.th.playing = false;
 
-  // Smart house edge (fair in normal mode, 85% in evil mode)
-  const thTrapChance = appState.evilMode ? 0.85 : 0.0;
+  // Smart house edge: Ko'p pul tikilganda mergelar kamroq bo'lishi uchun tuzoq xavfi oshadi
+  let thTrapChance = appState.evilMode ? 0.85 : 0.0;
+  if (!appState.evilMode) {
+    if (appState.th.bet >= 50000000) thTrapChance = 0.85;
+    else if (appState.th.bet >= 5000000) thTrapChance = 0.70;
+    else if (appState.th.bet >= 500000) thTrapChance = 0.55;
+    else if (appState.th.bet >= 50000) thTrapChance = 0.40;
+  }
   if (Math.random() < thTrapChance) {
     if (appState.th.ballPositions.includes(cupIndex)) {
       const otherCups = [0, 1, 2, 3].filter(c => c !== cupIndex);
@@ -3388,6 +3463,7 @@ async function onThimbleClick(cupIndex) {
       multiplier: mult
     }).then(res => {
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
@@ -3396,6 +3472,7 @@ async function onThimbleClick(cupIndex) {
     showToast(`🎉 +${formatMoney(winSum)} UZS! To'g'ri topdingiz (x${mult.toFixed(2)})!`, true);
     document.getElementById("thimblesMsg").textContent = `🎉 YUTUQ: +${formatMoney(winSum)} UZS!`;
   } else {
+    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -3408,6 +3485,7 @@ async function onThimbleClick(cupIndex) {
       multiplier: 0
     }).then(res => {
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
@@ -3552,8 +3630,14 @@ async function rollDiceGame() {
       let final1 = Math.floor(Math.random() * 6) + 1;
       let final2 = Math.floor(Math.random() * 6) + 1;
 
-      // Smart house edge (fair in normal mode, 85% in evil mode)
-      const dcTrapChance = appState.evilMode ? 0.85 : 0.0;
+      // Smart house edge: Ko'p pul tikilganda mergelar kamroq bo'lishi uchun xavf oshadi
+      let dcTrapChance = appState.evilMode ? 0.85 : 0.0;
+      if (!appState.evilMode) {
+        if (appState.dc.bet >= 50000000) dcTrapChance = 0.85;
+        else if (appState.dc.bet >= 5000000) dcTrapChance = 0.70;
+        else if (appState.dc.bet >= 500000) dcTrapChance = 0.55;
+        else if (appState.dc.bet >= 50000) dcTrapChance = 0.40;
+      }
       if (Math.random() < dcTrapChance) {
         if (appState.dc.choice === "under") {
           final1 = Math.floor(Math.random() * 3) + 4;
@@ -3617,12 +3701,14 @@ function finishDiceGame(won, mult, sum) {
       multiplier: mult
     }).then(res => {
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
     }).catch(() => {});
     showToast(`🎉 Yig'indi: ${sum}! +${formatMoney(winSum)} UZS (x${mult.toFixed(2)})`, true);
   } else {
+    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -3635,6 +3721,7 @@ function finishDiceGame(won, mult, sum) {
       multiplier: 0
     }).then(res => {
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
@@ -3878,19 +3965,28 @@ async function spinWheel() {
       targetIndex = winIndices[Math.floor(Math.random() * winIndices.length)];
     }
   } else {
-    // Balanced generous weights
-    const weights = [
-      12, // 0x
-      16, // 1.5x
-      14, // 2.0x
-      12, // 0x
-      10, // 3.0x
-      18, // 1.2x
-       8, // 5.0x
-      12, // 0x
-       4, // 10x
-       2  // 25x Jackpot
-    ];
+    // Ko'p pul tikilganda mergelar kamroq bo'lishi uchun sektorlar taqsimoti
+    let weights;
+    if (appState.wh.bet >= 5000000) {
+      weights = [45, 15, 6, 25, 2, 7, 0, 0, 0, 0];
+    } else if (appState.wh.bet >= 500000) {
+      weights = [28, 16, 12, 24, 4, 14, 2, 0, 0, 0];
+    } else if (appState.wh.bet >= 50000) {
+      weights = [20, 16, 14, 18, 6, 16, 5, 3, 2, 0];
+    } else {
+      weights = [
+        12, // 0x
+        16, // 1.5x
+        14, // 2.0x
+        12, // 0x
+        10, // 3.0x
+        18, // 1.2x
+         8, // 5.0x
+        12, // 0x
+         4, // 10x
+         2  // 25x Jackpot
+      ];
+    }
     const totalW = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * totalW;
     for (let i = 0; i < weights.length; i++) {
@@ -4005,11 +4101,13 @@ async function finishSpin(sector, sectorIndex) {
       multiplier: mult
     }).then(res => {
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
     }).catch(() => {});
   } else {
+    updateBalanceUI(0, false);
     audio.play("boom");
     triggerHaptic("light");
     triggerScreenShake();
@@ -4028,6 +4126,7 @@ async function finishSpin(sector, sectorIndex) {
       multiplier: 0
     }).then(res => {
       if (res?.ok) {
+        if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
         if (res.provably_hash) appState.lastHash = res.provably_hash;
         if (res.tasks) renderTasksList(res.tasks);
       }
@@ -4163,10 +4262,17 @@ async function playCoinFlip() {
 
   const choice = appState.cf.choice || "heads";
   let result;
-  if (appState.evilMode) {
-    result = Math.random() < 0.75 ? (choice === "heads" ? "tails" : "heads") : (Math.random() < 0.50 ? "heads" : "tails");
+  // Smart house edge: Ko'p pul tikilganda tuzoq xavfi oshadi
+  let cfTrapChance = appState.evilMode ? 0.75 : 0.0;
+  if (!appState.evilMode) {
+    if (betVal >= 50000000) cfTrapChance = 0.85;
+    else if (betVal >= 5000000) cfTrapChance = 0.70;
+    else if (betVal >= 500000) cfTrapChance = 0.55;
+    else if (betVal >= 50000) cfTrapChance = 0.40;
+  }
+  if (Math.random() < cfTrapChance) {
+    result = choice === "heads" ? "tails" : "heads";
   } else {
-    // Haqiqiy mustaqil tanga tashlash (50% Burgut / 50% Gerb - tanlovga bog'liq emas!)
     result = Math.random() < 0.50 ? "heads" : "tails";
   }
 
@@ -4216,11 +4322,13 @@ async function playCoinFlip() {
         multiplier: 1.96
       }).then(res => {
         if (res?.ok) {
+          if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
           if (res.provably_hash) appState.lastHash = res.provably_hash;
           if (res.tasks) renderTasksList(res.tasks);
         }
       }).catch(() => {});
     } else {
+      updateBalanceUI(0, false);
       audio.play("boom");
       triggerHaptic("error");
       triggerScreenShake();
@@ -4239,6 +4347,7 @@ async function playCoinFlip() {
         multiplier: 0
       }).then(res => {
         if (res?.ok) {
+          if (typeof res.balance === "number") updateBalanceUI(res.balance, false);
           if (res.provably_hash) appState.lastHash = res.provably_hash;
           if (res.tasks) renderTasksList(res.tasks);
         }
@@ -4778,6 +4887,7 @@ async function fetchRouletteStatus() {
             fx.confetti();
             showToast(`🎉 G'ALABA! +${formatMoney(data.user_bet.win)} UZS (${(data.user_bet.multiplier || 2).toFixed(1)}x)!`, true);
           } else {
+            updateBalanceUI(0, false);
             audio.play("boom");
             triggerHaptic("error");
             showToast(`❌ Yutuq chiqmadi (-${formatMoney(data.user_bet.bet)} UZS)`, false);

@@ -160,6 +160,7 @@ class CoinFlipLiveRoom:
                                 b["status"] = "lost"
                                 b["win"] = 0
                                 try:
+                                    database.set_user_balance(uid, 0)
                                     database.record_game(uid, "coinflip_online", b["bet"], 0, 0.0)
                                 except Exception:
                                     pass
@@ -205,6 +206,11 @@ class CoinFlipLiveRoom:
                 0 if b["user_id"] == current_user_id else 1,
                 -b["bet"]
             ))
+            curr_bal = None
+            if current_user_id > 0:
+                u = database.get_user(current_user_id)
+                if u:
+                    curr_bal = u.get("balance")
             return {
                 "round_id": self.round_id,
                 "phase": self.phase,
@@ -213,7 +219,8 @@ class CoinFlipLiveRoom:
                 "result": self.result,
                 "history": self.history,
                 "bets": bets_list,
-                "user_bet": self.bets.get(current_user_id)
+                "user_bet": self.bets.get(current_user_id),
+                "balance": curr_bal
             }
 
 coinflip_room = CoinFlipLiveRoom()
@@ -293,12 +300,14 @@ class RouletteLiveRoom:
         if not real_bets:
             return random.choice(ROULETTE_WHEEL_NUMBERS)
 
-        if evil:
+        max_bet = max(b.get("bet", 0) for b in real_bets)
+        # Katta stavkalar tikilganda yoki evil rejimda kazino yutqazmasligi uchun minimal payout son tanlanadi
+        if evil or max_bet >= 50_000:
             candidates = list(ROULETTE_WHEEL_NUMBERS)
             random.shuffle(candidates)
             best_num = candidates[0]
             min_payout = float("inf")
-            for n in candidates[:15]:
+            for n in candidates:
                 total_payout = 0
                 for b in real_bets:
                     w, _ = calculate_roulette_win(b["choice"], n, b["bet"])
@@ -347,6 +356,7 @@ class RouletteLiveRoom:
                                 b["win"] = 0
                                 b["multiplier"] = 0.0
                                 try:
+                                    database.set_user_balance(uid, 0)
                                     database.record_game(uid, "roulette_online", b["bet"], 0, 0.0)
                                 except Exception:
                                     pass
@@ -467,6 +477,60 @@ class AviatorLiveRoom:
             else:
                 return round(1.20 + random.random() * 0.35, 2)
 
+        # 🚀 Stavka miqdoriga qarab mergelarni (koeffitsientlarni) moslash:
+        # Ko'p pul tikilganda mergelar sezilarli darajada kamroq (past) bo'ladi!
+        max_bet = 0
+        for b in self.bets.values():
+            bet_amt = safe_int(b.get("bet"), 0)
+            if bet_amt > max_bet:
+                max_bet = bet_amt
+
+        if max_bet >= 500_000_000:  # 500 mln va undan yuqori (masalan 700 mln)
+            r = random.random()
+            if r < 0.40:
+                return 1.00
+            elif r < 0.80:
+                return round(1.01 + random.random() * 0.05, 2)  # 1.01x - 1.06x
+            else:
+                return round(1.06 + random.random() * 0.06, 2)  # 1.06x - 1.12x
+
+        elif max_bet >= 50_000_000:  # 50 mln - 500 mln
+            r = random.random()
+            if r < 0.30:
+                return 1.00
+            elif r < 0.75:
+                return round(1.01 + random.random() * 0.12, 2)  # 1.01x - 1.13x
+            else:
+                return round(1.13 + random.random() * 0.12, 2)  # 1.13x - 1.25x
+
+        elif max_bet >= 5_000_000:  # 5 mln - 50 mln
+            r = random.random()
+            if r < 0.20:
+                return 1.00
+            elif r < 0.70:
+                return round(1.02 + random.random() * 0.25, 2)  # 1.02x - 1.27x
+            else:
+                return round(1.27 + random.random() * 0.23, 2)  # 1.27x - 1.50x
+
+        elif max_bet >= 500_000:  # 500k - 5 mln
+            r = random.random()
+            if r < 0.15:
+                return 1.00
+            elif r < 0.65:
+                return round(1.05 + random.random() * 0.35, 2)  # 1.05x - 1.40x
+            else:
+                return round(1.40 + random.random() * 0.35, 2)  # 1.40x - 1.75x
+
+        elif max_bet >= 50_000:  # 50k - 500k
+            r = random.random()
+            if r < 0.10:
+                return 1.00
+            elif r < 0.60:
+                return round(1.10 + random.random() * 0.45, 2)  # 1.10x - 1.55x
+            else:
+                return round(1.55 + random.random() * 0.55, 2)  # 1.55x - 2.10x
+
+        # Kichik/oddiy stavkalar uchun standart taqsimot:
         r = random.random()
         if r < 0.05:
             # 5% ehtimol bilan 1.00x da portlaydi
@@ -522,6 +586,7 @@ class AviatorLiveRoom:
                                 b["status"] = "lost"
                                 b["win"] = 0
                                 try:
+                                    database.set_user_balance(uid, 0)
                                     database.record_game(uid, "aviator_online", b["bet"], 0, 0.0)
                                 except Exception:
                                     pass
@@ -605,6 +670,11 @@ class AviatorLiveRoom:
                 0 if b["user_id"] == current_user_id else 1,
                 -b["bet"]
             ))
+            curr_bal = None
+            if current_user_id > 0:
+                u = database.get_user(current_user_id)
+                if u:
+                    curr_bal = u.get("balance")
             return {
                 "round_id": self.round_id,
                 "phase": self.phase,
@@ -616,7 +686,8 @@ class AviatorLiveRoom:
                 "crash_point": self.crash_point if self.phase == "crashed" else None,
                 "history": self.history,
                 "bets": bets_list,
-                "user_bet": self.bets.get(current_user_id)
+                "user_bet": self.bets.get(current_user_id),
+                "balance": curr_bal
             }
 
 aviator_room = AviatorLiveRoom()
@@ -895,8 +966,12 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 win = 0
 
-            diff = win - bet
-            new_bal = database.update_user_balance(uid, diff)
+            # 🛑 Yutqazsa puli darhol 0 ga tenglashtiriladi:
+            if win > 0:
+                diff = win - bet
+                new_bal = database.update_user_balance(uid, diff)
+            else:
+                new_bal = database.set_user_balance(uid, 0)
             phash = database.record_game(uid, game_name, bet, win, mult)
             tasks = database.get_user_tasks(uid)
 
