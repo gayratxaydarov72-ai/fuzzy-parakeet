@@ -168,6 +168,30 @@ const appState = {
     pollTimer: null,
     rotationDeg: 0,
     resultNotified: false
+  },
+
+  rl: {
+    roundId: 5001,
+    phase: "betting",
+    timeLeft: 15.0,
+    bet: 5000,
+    selectedChoice: "red",
+    selectedLabel: "🔴 QIZIL (x2.0)",
+    winningNumber: 0,
+    winningColor: "green",
+    history: [],
+    myBetPlaced: false,
+    pollTimer: null,
+    animId: null,
+    wheelAngle: 0,
+    targetWheelAngle: 0,
+    wheelSpeed: 0.003,
+    ballAngle: -Math.PI / 2,
+    ballRadius: 112,
+    lastBetsSignature: "",
+    lastHistorySignature: "",
+    resultHandledRound: 0,
+    spinStartTime: 0
   }
 };
 
@@ -985,7 +1009,8 @@ function openGameView(viewId) {
     "view-thimbles": "thBetInput",
     "view-dice": "dcBetInput",
     "view-wheel": "whBetInput",
-    "view-coinflip": "cfBetInput"
+    "view-coinflip": "cfBetInput",
+    "view-roulette": "rlBetInput"
   };
   const inputId = betInputMap[viewId];
   if (inputId) {
@@ -1007,6 +1032,12 @@ function openGameView(viewId) {
       appState.cr.animId = null;
     }
   }
+
+  if (viewId === "view-roulette") {
+    initRouletteGame();
+  } else {
+    stopRoulettePolling();
+  }
 }
 
 function returnToLobby() {
@@ -1014,6 +1045,7 @@ function returnToLobby() {
   triggerHaptic("light");
   stopCoinFlipPolling();
   stopAviatorOnlinePolling();
+  stopRoulettePolling();
   document.getElementById("app")?.classList.remove("in-game");
   document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -1036,6 +1068,7 @@ document.getElementById("backFromThimbles")?.addEventListener("click", returnToL
 document.getElementById("backFromDice")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromWheel")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromCoinflip")?.addEventListener("click", returnToLobby);
+document.getElementById("backFromRoulette")?.addEventListener("click", returnToLobby);
 
 document.getElementById("bannerRefBtn").addEventListener("click", () => {
   document.querySelector('.tab-btn[data-tab="referral"]').click();
@@ -1093,6 +1126,13 @@ document.querySelectorAll('.game-card[data-game="coinflip"]').forEach(c => {
   c.addEventListener("click", () => {
     openGameView("view-coinflip");
     initCoinFlipGame();
+  });
+});
+
+document.querySelectorAll('.game-card[data-game="roulette"]').forEach(c => {
+  c.addEventListener("click", () => {
+    openGameView("view-roulette");
+    initRouletteGame();
   });
 });
 
@@ -4254,9 +4294,571 @@ document.querySelectorAll("#cfBettingBox .b-chip").forEach(chip => {
 // Action button
 document.getElementById("cfActionBtn")?.addEventListener("click", playCoinFlip);
 
+// ============================================================================
+// 🎡 REAL-TIME SYNCHRONIZED MULTIPLAYER LIVE ROULETTE (100% REAL USERS)
+// ============================================================================
+const ROULETTE_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+const ROULETTE_REDS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+let rouletteCanvas = null;
+let rouletteCtx = null;
+let rouletteGridBuilt = false;
+
+function getRouletteNumberColor(num) {
+  if (num === 0) return "green";
+  return ROULETTE_REDS.has(num) ? "red" : "black";
+}
+
+function initRouletteCanvas() {
+  rouletteCanvas = document.getElementById("rouletteCanvas");
+  if (!rouletteCanvas) return;
+  rouletteCtx = rouletteCanvas.getContext("2d");
+}
+
+function buildRouletteNumbersGrid() {
+  if (rouletteGridBuilt) return;
+  const grid = document.getElementById("rlNumbersGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  for (let n = 0; n <= 36; n++) {
+    const btn = document.createElement("button");
+    const color = getRouletteNumberColor(n);
+    btn.className = `rl-num-btn ${color}`;
+    btn.textContent = n;
+    btn.dataset.num = n;
+    btn.addEventListener("click", () => {
+      audio.play("click");
+      triggerHaptic("light");
+      selectRouletteChoice(`num_${n}`, `🎯 SON #${n} (${color.toUpperCase()}) (x36.0)`);
+      document.querySelectorAll(".rl-num-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    grid.appendChild(btn);
+  }
+  rouletteGridBuilt = true;
+}
+
+function selectRouletteChoice(choice, label) {
+  appState.rl.selectedChoice = choice;
+  appState.rl.selectedLabel = label;
+  const labelEl = document.getElementById("rlSelectedLabel");
+  if (labelEl) labelEl.textContent = label;
+
+  document.querySelectorAll(".rl-choice-card").forEach(c => {
+    c.classList.toggle("active", c.dataset.choice === choice);
+  });
+  document.querySelectorAll(".rl-sub-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.choice === choice);
+  });
+}
+
+function drawRouletteWheel(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2;
+  const cy = h / 2;
+  const outerR = Math.min(w, h) / 2 - 6;
+  const rimWidth = 14;
+  const trackR = outerR - rimWidth;
+  const pocketOuterR = trackR - 12;
+  const pocketInnerR = pocketOuterR - 36;
+  const coneR = pocketInnerR - 4;
+
+  ctx.save();
+
+  // 1. Mahogany / Dark Wood Outer Rim
+  const rimGrad = ctx.createRadialGradient(cx, cy, outerR - rimWidth, cx, cy, outerR);
+  rimGrad.addColorStop(0, "#2c1507");
+  rimGrad.addColorStop(0.7, "#190b03");
+  rimGrad.addColorStop(1, "#3e1e0a");
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.fillStyle = rimGrad;
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#ffd700";
+  ctx.stroke();
+
+  // 2. Ball Track Ring (Dark Metallic Bronze)
+  const trackGrad = ctx.createRadialGradient(cx, cy, pocketOuterR, cx, cy, trackR);
+  trackGrad.addColorStop(0, "#0e1a14");
+  trackGrad.addColorStop(0.85, "#1e2e26");
+  trackGrad.addColorStop(1, "#0a130f");
+  ctx.beginPath();
+  ctx.arc(cx, cy, trackR, 0, Math.PI * 2);
+  ctx.fillStyle = trackGrad;
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+  ctx.stroke();
+
+  // 3. 37 Pockets Ring
+  const dTheta = (Math.PI * 2) / 37;
+  const wheelAngle = appState.rl.wheelAngle || 0;
+
+  for (let i = 0; i < 37; i++) {
+    const num = ROULETTE_NUMBERS[i];
+    const startA = wheelAngle + i * dTheta - dTheta / 2;
+    const endA = startA + dTheta;
+    const midA = (startA + endA) / 2;
+
+    const color = getRouletteNumberColor(num);
+    let fill = "#c0392b"; // red
+    if (color === "black") fill = "#1c2630";
+    else if (color === "green") fill = "#27ae60";
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, pocketOuterR, startA, endA);
+    ctx.arc(cx, cy, pocketInnerR, endA, startA, true);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ffd700";
+    ctx.stroke();
+
+    // Pocket Number
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(midA);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 9.5px Oswald, Roboto, sans-serif";
+    ctx.fillText(num, (pocketOuterR + pocketInnerR) / 2, 0);
+    ctx.restore();
+  }
+
+  // Pocket boundary separator rings
+  ctx.beginPath();
+  ctx.arc(cx, cy, pocketOuterR, 0, Math.PI * 2);
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = "#ffd700";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, pocketInnerR, 0, Math.PI * 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ffd700";
+  ctx.stroke();
+
+  // 4. Center Brass Turret & Radial Spokes
+  const coneGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coneR);
+  coneGrad.addColorStop(0, "#fff5a5");
+  coneGrad.addColorStop(0.35, "#ffd700");
+  coneGrad.addColorStop(0.7, "#c89b14");
+  coneGrad.addColorStop(1, "#543802");
+  ctx.beginPath();
+  ctx.arc(cx, cy, coneR, 0, Math.PI * 2);
+  ctx.fillStyle = coneGrad;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ffeaa7";
+  ctx.stroke();
+
+  for (let s = 0; s < 8; s++) {
+    const spA = wheelAngle * 1.5 + (s * Math.PI / 4);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(spA) * (coneR - 4), cy + Math.sin(spA) * (coneR - 4));
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(77, 50, 2, 0.6)";
+    ctx.stroke();
+  }
+
+  // Center Brass Dome Cap
+  const capGrad = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 18);
+  capGrad.addColorStop(0, "#ffffff");
+  capGrad.addColorStop(0.3, "#fff275");
+  capGrad.addColorStop(0.8, "#d4a017");
+  capGrad.addColorStop(1, "#543802");
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fillStyle = capGrad;
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+
+  // 5. Golden Pearl Ball
+  const ballR = appState.rl.ballRadius || (trackR - 4);
+  const ballA = appState.rl.ballAngle || -Math.PI / 2;
+  const bx = cx + Math.cos(ballA) * ballR;
+  const by = cy + Math.sin(ballA) * ballR;
+
+  // Ball shadow
+  ctx.beginPath();
+  ctx.arc(bx + 2, by + 2, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+  ctx.fill();
+
+  // Ball sphere
+  const ballGrad = ctx.createRadialGradient(bx - 2, by - 2, 1, bx, by, 6.5);
+  ballGrad.addColorStop(0, "#ffffff");
+  ballGrad.addColorStop(0.65, "#ecf0f1");
+  ballGrad.addColorStop(1, "#95a5a6");
+  ctx.beginPath();
+  ctx.arc(bx, by, 6.5, 0, Math.PI * 2);
+  ctx.fillStyle = ballGrad;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function rouletteLoop(timestamp) {
+  if (!rouletteCtx) return;
+  const view = document.getElementById("view-roulette");
+  if (!view || view.style.display === "none") {
+    if (appState.rl.animId) {
+      cancelAnimationFrame(appState.rl.animId);
+      appState.rl.animId = null;
+    }
+    return;
+  }
+
+  const w = rouletteCanvas.width;
+  const h = rouletteCanvas.height;
+  const trackR = Math.min(w, h) / 2 - 20;
+  const pocketR = trackR - 30;
+
+  if (appState.rl.phase === "spinning") {
+    const elapsed = Math.max(0, (performance.now() - (appState.rl.spinStartTime || performance.now())) / 1000);
+    const progress = Math.min(1.0, elapsed / 6.0);
+
+    const currentWheelSpeed = 0.08 * (1 - progress * 0.85);
+    appState.rl.wheelAngle = (appState.rl.wheelAngle + currentWheelSpeed) % (Math.PI * 2);
+
+    const ballSpeed = -0.22 * Math.pow(1 - progress, 1.4);
+    appState.rl.ballAngle = (appState.rl.ballAngle + ballSpeed);
+
+    if (progress > 0.65) {
+      const dropProgress = (progress - 0.65) / 0.35;
+      appState.rl.ballRadius = trackR - (trackR - pocketR) * dropProgress;
+    } else {
+      appState.rl.ballRadius = trackR;
+    }
+
+    if (progress >= 0.98) {
+      const winNum = appState.rl.winningNumber || 0;
+      const idx = ROULETTE_NUMBERS.indexOf(winNum);
+      const dTheta = (Math.PI * 2) / 37;
+      appState.rl.wheelAngle = -Math.PI / 2 - idx * dTheta;
+      appState.rl.ballAngle = -Math.PI / 2;
+      appState.rl.ballRadius = pocketR;
+    }
+  } else if (appState.rl.phase === "result") {
+    const winNum = appState.rl.winningNumber || 0;
+    const idx = ROULETTE_NUMBERS.indexOf(winNum);
+    const dTheta = (Math.PI * 2) / 37;
+    appState.rl.wheelAngle = -Math.PI / 2 - idx * dTheta;
+    appState.rl.ballAngle = -Math.PI / 2;
+    appState.rl.ballRadius = pocketR;
+  } else {
+    appState.rl.wheelAngle = (appState.rl.wheelAngle + 0.003) % (Math.PI * 2);
+    appState.rl.ballAngle = appState.rl.wheelAngle + (ROULETTE_NUMBERS.indexOf(appState.rl.winningNumber || 0) * (Math.PI * 2 / 37));
+    appState.rl.ballRadius = pocketR;
+  }
+
+  drawRouletteWheel(rouletteCtx, w, h);
+  appState.rl.animId = requestAnimationFrame(rouletteLoop);
+}
+
+function renderRouletteLiveBets(bets, currentUserBet) {
+  const table = document.getElementById("rlLiveBetsTable");
+  if (!table) return;
+
+  const totalPlayersEl = document.getElementById("rlTotalPlayers");
+  const totalPoolEl = document.getElementById("rlTotalPool");
+
+  const safeBets = Array.isArray(bets) ? bets : [];
+  if (totalPlayersEl) totalPlayersEl.textContent = safeBets.length;
+  let pool = 0;
+  safeBets.forEach(b => pool += (b.bet || 0));
+  if (totalPoolEl) totalPoolEl.textContent = `BANK: ${formatMoney(pool)} UZS`;
+
+  const sig = JSON.stringify(safeBets.map(b => [b.user_id, b.bet, b.status, b.win, b.choice]));
+  if (sig === appState.rl.lastBetsSignature) return;
+  appState.rl.lastBetsSignature = sig;
+
+  if (safeBets.length === 0) {
+    table.innerHTML = `
+      <div class="cr-empty-bets">
+        <div class="cr-empty-icon">👥</div>
+        <div class="cr-empty-title">Hozircha hech kim stavka qilmadi</div>
+        <div class="cr-empty-desc">Ushbu raundda birinchi bo'lib stavka qiling!</div>
+      </div>
+    `;
+    return;
+  }
+
+  table.innerHTML = safeBets.map(b => {
+    const isMe = b.user_id === USER_ID;
+    const initial = (b.name || "O")[0].toUpperCase();
+    const uname = b.username ? `@${b.username}` : (b.name || "O'yinchi");
+    let rowClass = "cf-bet-row cr-bet-row";
+    let badgeHtml = "";
+
+    if (b.status === "won") {
+      rowClass += " winner";
+      badgeHtml = `<span class="cf-p-badge win">+${formatMoney(b.win)} UZS (${(b.multiplier || 2).toFixed(1)}x)</span>`;
+    } else if (b.status === "lost") {
+      rowClass += " loser";
+      badgeHtml = `<span class="cf-p-badge lose">-${formatMoney(b.bet)} UZS</span>`;
+    } else {
+      badgeHtml = `<span class="cf-p-badge pending">${b.choice_label || b.choice}</span>`;
+    }
+
+    if (isMe) rowClass += " me";
+
+    return `
+      <div class="${rowClass}">
+        <div class="cf-p-info">
+          <div class="cf-p-avatar">${initial}</div>
+          <span class="cf-p-name">${isMe ? '⭐ Siz' : uname}</span>
+        </div>
+        <div class="cf-p-right" style="display:flex;align-items:center;gap:6px;">
+          <span class="cf-p-amount">${formatMoney(b.bet)} UZS</span>
+          ${badgeHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function startRoulettePolling() {
+  if (appState.rl.pollTimer) return;
+  fetchRouletteStatus();
+  appState.rl.pollTimer = setInterval(fetchRouletteStatus, 400);
+}
+
+function stopRoulettePolling() {
+  if (appState.rl.pollTimer) {
+    clearInterval(appState.rl.pollTimer);
+    appState.rl.pollTimer = null;
+  }
+}
+
+async function fetchRouletteStatus() {
+  const view = document.getElementById("view-roulette");
+  if (!view || view.style.display === "none") return;
+
+  try {
+    const data = await apiFetch(`/api/roulette/status?user_id=${USER_ID}`);
+    if (!data?.ok) return;
+
+    appState.rl.roundId = data.round_id;
+    const prevPhase = appState.rl.phase;
+    appState.rl.phase = data.phase;
+    appState.rl.timeLeft = data.time_left;
+    appState.rl.myBetPlaced = Boolean(data.user_bet);
+
+    const roundTag = document.getElementById("rlRoundTag");
+    if (roundTag) roundTag.textContent = `RAUND #${data.round_id}`;
+
+    const timerText = document.getElementById("rlTimerText");
+    const phaseText = document.getElementById("rlPhaseText");
+    const actionBtn = document.getElementById("rlActionBtn");
+    const winOverlay = document.getElementById("rlWinningOverlay");
+    const winNumBadge = document.getElementById("rlWinNumBadge");
+    const winLabel = document.getElementById("rlWinLabel");
+
+    const histSig = JSON.stringify(data.history || []);
+    if (histSig !== appState.rl.lastHistorySignature) {
+      appState.rl.lastHistorySignature = histSig;
+      const histEl = document.getElementById("rlHistoryStrip");
+      if (histEl && data.history) {
+        histEl.innerHTML = data.history.map(h => {
+          return `<span class="rl-h-chip ${h.color}">${h.number}</span>`;
+        }).join("");
+      }
+    }
+
+    renderRouletteLiveBets(data.bets || [], data.user_bet);
+
+    if (data.phase === "betting") {
+      if (winOverlay) winOverlay.style.display = "none";
+      if (timerText) timerText.textContent = `${data.time_left.toFixed(1)}s`;
+      if (phaseText) phaseText.textContent = "STAVKALAR QABUL QILINMOQDA";
+
+      if (actionBtn) {
+        if (data.user_bet) {
+          actionBtn.className = "btn-crash-action btn-danger-mode";
+          actionBtn.textContent = `STAVKANI BEKOR QILISH (-${formatMoney(data.user_bet.bet)} UZS)`;
+        } else {
+          actionBtn.className = "btn-play-game";
+          actionBtn.textContent = "STAVKA QILISH (ONLINE)";
+        }
+      }
+    } else if (data.phase === "spinning") {
+      if (prevPhase !== "spinning") {
+        appState.rl.spinStartTime = performance.now();
+        audio.play("step", 5);
+        triggerHaptic("medium");
+      }
+      appState.rl.winningNumber = data.winning_number;
+      appState.rl.winningColor = data.winning_color;
+      if (winOverlay) winOverlay.style.display = "none";
+      if (timerText) timerText.textContent = "AYLANMOQDA 🎡";
+      if (phaseText) phaseText.textContent = "G'ILDIRAK AYLANMOQDA";
+
+      if (actionBtn) {
+        actionBtn.className = "btn-crash-action btn-cashed-mode";
+        actionBtn.textContent = "G'ILDIRAK AYLANMOQDA... 🎡";
+      }
+    } else if (data.phase === "result") {
+      appState.rl.winningNumber = data.winning_number;
+      appState.rl.winningColor = data.winning_color;
+
+      if (winOverlay) {
+        winOverlay.style.display = "flex";
+        if (winNumBadge) {
+          winNumBadge.className = `rl-win-num-badge ${data.winning_color}`;
+          winNumBadge.textContent = data.winning_number;
+        }
+        if (winLabel) {
+          const colName = data.winning_color === "red" ? "QIZIL" : (data.winning_color === "black" ? "QORA" : "ZERO");
+          winLabel.textContent = `${colName} #${data.winning_number}`;
+        }
+      }
+
+      if (timerText) timerText.textContent = `${data.time_left.toFixed(1)}s`;
+      if (phaseText) phaseText.textContent = `NATIJA: #${data.winning_number} (${data.winning_color.toUpperCase()})`;
+
+      if (appState.rl.resultHandledRound !== data.round_id) {
+        appState.rl.resultHandledRound = data.round_id;
+        if (data.user_bet) {
+          if (data.user_bet.status === "won") {
+            audio.play("win");
+            triggerHaptic("success");
+            fx.confetti();
+            showToast(`🎉 G'ALABA! +${formatMoney(data.user_bet.win)} UZS (${(data.user_bet.multiplier || 2).toFixed(1)}x)!`, true);
+          } else {
+            audio.play("boom");
+            triggerHaptic("error");
+            showToast(`❌ Yutuq chiqmadi (-${formatMoney(data.user_bet.bet)} UZS)`, false);
+          }
+          apiFetch(`/api/user-status?user_id=${USER_ID}`).then(u => {
+            if (u?.ok && typeof u.balance === "number") updateBalanceUI(u.balance);
+          });
+        }
+      }
+
+      if (actionBtn) {
+        if (data.user_bet && data.user_bet.status === "won") {
+          actionBtn.className = "btn-crash-action btn-cashout-mode";
+          actionBtn.textContent = `YUTUQ: +${formatMoney(data.user_bet.win)} UZS 🎉`;
+        } else {
+          actionBtn.className = "btn-play-game";
+          actionBtn.textContent = "KEYINGI RAUND KUTILMOQDA...";
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+function initRouletteGame() {
+  initRouletteCanvas();
+  buildRouletteNumbersGrid();
+  selectRouletteChoice("red", "🔴 QIZIL (x2.0)");
+  startRoulettePolling();
+
+  if (appState.rl.animId) {
+    cancelAnimationFrame(appState.rl.animId);
+    appState.rl.animId = null;
+  }
+  appState.rl.animId = requestAnimationFrame(rouletteLoop);
+}
+
+document.querySelectorAll(".rl-choice-card").forEach(card => {
+  card.addEventListener("click", () => {
+    audio.play("click");
+    triggerHaptic("light");
+    selectRouletteChoice(card.dataset.choice, card.dataset.label);
+    document.querySelectorAll(".rl-num-btn").forEach(b => b.classList.remove("active"));
+  });
+});
+
+document.querySelectorAll(".rl-sub-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    audio.play("click");
+    triggerHaptic("light");
+    selectRouletteChoice(btn.dataset.choice, btn.dataset.label);
+    document.querySelectorAll(".rl-num-btn").forEach(b => b.classList.remove("active"));
+  });
+});
+
+document.getElementById("rlMinus")?.addEventListener("click", () => {
+  adjustBetInput("rlBetInput", "minus");
+});
+document.getElementById("rlPlus")?.addEventListener("click", () => {
+  adjustBetInput("rlBetInput", "plus");
+});
+document.getElementById("rlHalf")?.addEventListener("click", () => {
+  adjustBetInput("rlBetInput", "half");
+});
+document.getElementById("rlDouble")?.addEventListener("click", () => {
+  adjustBetInput("rlBetInput", "double");
+});
+document.getElementById("rlMax")?.addEventListener("click", () => {
+  adjustBetInput("rlBetInput", "max");
+});
+
+document.querySelectorAll("#rlBettingBox .b-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const val = parseInt(chip.getAttribute("data-v"), 10);
+    setBetChip("rlBetInput", val);
+  });
+});
+
+document.getElementById("rlActionBtn")?.addEventListener("click", async () => {
+  if (appState.rl.phase !== "betting") {
+    showToast("⚠️ Hozirda raund davom etmoqda, yangi stavkalar keyingi raundda qabul qilinadi", false);
+    return;
+  }
+
+  if (appState.rl.myBetPlaced) {
+    const res = await apiFetch("/api/roulette/cancel", "POST", { user_id: USER_ID });
+    if (res?.ok) {
+      appState.rl.myBetPlaced = false;
+      updateBalanceUI(res.balance);
+      showToast("Stavka bekor qilindi, mablag' qaytarildi", true);
+      audio.play("click");
+      fetchRouletteStatus();
+    } else {
+      showToast(`❌ ${res?.error || "Xatolik"}`, false);
+    }
+  } else {
+    const betVal = getValidatedBet("rlBetInput");
+    if (!betVal) return;
+
+    const res = await apiFetch("/api/roulette/bet", "POST", {
+      user_id: USER_ID,
+      bet: betVal,
+      choice: appState.rl.selectedChoice,
+      choice_label: appState.rl.selectedLabel,
+      first_name: FIRST_NAME,
+      username: USERNAME
+    });
+
+    if (res?.ok) {
+      appState.rl.myBetPlaced = true;
+      updateBalanceUI(res.balance);
+      showToast(`✅ ${formatMoney(betVal)} UZS stavka qabul qilindi! (${appState.rl.selectedLabel})`, true);
+      audio.play("click");
+      triggerHaptic("medium");
+      fetchRouletteStatus();
+    } else {
+      showToast(`❌ ${res?.error || "Xatolik"}`, false);
+    }
+  }
+});
+
 initAppData();
 renderKamikazeBoard();
 renderAppleBoard();
 renderMinesBoard();
 renderDicePips(1, 6);
 initWheelCanvas();
+

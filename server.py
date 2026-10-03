@@ -110,39 +110,10 @@ class CoinFlipLiveRoom:
         self.phase_end_time = time.time() + 10.0
         self.result = None  # "heads" or "tails"
         self.history = ["heads", "tails", "heads", "heads", "tails"]
-        self.bets = {}  # uid -> dict
-        self.simulated_users = [
-            {"user_id": 8801, "name": "Jasur Crypto", "username": "jasur_crypto"},
-            {"user_id": 8802, "name": "Azamat UZ", "username": "azamat_uz"},
-            {"user_id": 8803, "name": "Farrux Bek", "username": "farrux_77"},
-            {"user_id": 8804, "name": "Bekzod", "username": "bekzod_01"},
-            {"user_id": 8805, "name": "Malika", "username": "malika_star"},
-            {"user_id": 8806, "name": "Islom Trader", "username": "islom_trader"},
-            {"user_id": 8807, "name": "Otabek", "username": "otabek_uzb"},
-            {"user_id": 8808, "name": "Sardor WIN", "username": "sardor_winner"}
-        ]
-        self.populate_simulated_bets()
+        self.bets = {}  # uid -> dict (ONLY real users!)
         self.running = True
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
-
-    def populate_simulated_bets(self):
-        count = random.randint(3, 5)
-        picked = random.sample(self.simulated_users, count)
-        amounts = [2000, 5000, 10000, 25000, 50000]
-        for u in picked:
-            choice = "heads" if random.random() < 0.5 else "tails"
-            amt = random.choice(amounts)
-            self.bets[u["user_id"]] = {
-                "user_id": u["user_id"],
-                "name": u["name"],
-                "username": u["username"],
-                "choice": choice,
-                "bet": amt,
-                "win": 0,
-                "status": "pending",
-                "is_real": False
-            }
 
     def _loop(self):
         while self.running:
@@ -180,20 +151,18 @@ class CoinFlipLiveRoom:
                             if b["choice"] == self.result:
                                 b["status"] = "won"
                                 b["win"] = int(b["bet"] * 1.96)
-                                if b.get("is_real"):
-                                    try:
-                                        database.update_user_balance(uid, b["win"])
-                                        database.record_game(uid, "coinflip_online", b["bet"], b["win"], 1.96)
-                                    except Exception:
-                                        pass
+                                try:
+                                    database.update_user_balance(uid, b["win"])
+                                    database.record_game(uid, "coinflip_online", b["bet"], b["win"], 1.96)
+                                except Exception:
+                                    pass
                             else:
                                 b["status"] = "lost"
                                 b["win"] = 0
-                                if b.get("is_real"):
-                                    try:
-                                        database.record_game(uid, "coinflip_online", b["bet"], 0, 0.0)
-                                    except Exception:
-                                        pass
+                                try:
+                                    database.record_game(uid, "coinflip_online", b["bet"], 0, 0.0)
+                                except Exception:
+                                    pass
 
                 elif self.phase == "result":
                     if now >= self.phase_end_time:
@@ -203,7 +172,6 @@ class CoinFlipLiveRoom:
                         self.phase_end_time = now + 10.0
                         self.result = None
                         self.bets.clear()
-                        self.populate_simulated_bets()
 
     def place_bet(self, user_id: int, name: str, username: str, choice: str, bet: int):
         with self.lock:
@@ -234,7 +202,7 @@ class CoinFlipLiveRoom:
             time_left = max(0.0, round(self.phase_end_time - now, 1))
             bets_list = list(self.bets.values())
             bets_list.sort(key=lambda b: (
-                0 if b["user_id"] == current_user_id else (1 if b.get("is_real") else 2),
+                0 if b["user_id"] == current_user_id else 1,
                 -b["bet"]
             ))
             return {
@@ -249,6 +217,206 @@ class CoinFlipLiveRoom:
             }
 
 coinflip_room = CoinFlipLiveRoom()
+
+# ============================================================================
+# 🎡 REAL-TIME SYNCHRONIZED MULTIPLAYER LIVE ROULETTE ROOM (100% REAL USERS)
+# ============================================================================
+ROULETTE_WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
+ROULETTE_RED_NUMBERS = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
+ROULETTE_BLACK_NUMBERS = {2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35}
+
+def get_roulette_color(num: int) -> str:
+    if num == 0:
+        return "green"
+    return "red" if num in ROULETTE_RED_NUMBERS else "black"
+
+def calculate_roulette_win(choice: str, num: int, bet: int):
+    choice = str(choice).lower().strip()
+    color = get_roulette_color(num)
+    
+    if choice == "red" and color == "red":
+        return int(bet * 2.0), 2.0
+    if choice == "black" and color == "black":
+        return int(bet * 2.0), 2.0
+    if (choice in ("green", "zero", "0")) and num == 0:
+        return int(bet * 36.0), 36.0
+    if choice == "even" and num > 0 and num % 2 == 0:
+        return int(bet * 2.0), 2.0
+    if choice == "odd" and num > 0 and num % 2 != 0:
+        return int(bet * 2.0), 2.0
+    if choice == "low" and 1 <= num <= 18:
+        return int(bet * 2.0), 2.0
+    if choice == "high" and 19 <= num <= 36:
+        return int(bet * 2.0), 2.0
+    if choice == "doz1" and 1 <= num <= 12:
+        return int(bet * 3.0), 3.0
+    if choice == "doz2" and 13 <= num <= 24:
+        return int(bet * 3.0), 3.0
+    if choice == "doz3" and 25 <= num <= 36:
+        return int(bet * 3.0), 3.0
+    if choice.startswith("num_"):
+        try:
+            target_n = int(choice.split("_")[1])
+            if target_n == num:
+                return int(bet * 36.0), 36.0
+        except Exception:
+            pass
+    return 0, 0.0
+
+class RouletteLiveRoom:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.round_id = 5001
+        self.phase = "betting"  # "betting" (15s) -> "spinning" (6.5s) -> "result" (5s)
+        self.total_phase_duration = 15.0
+        self.phase_end_time = time.time() + 15.0
+        self.winning_number = 0
+        self.winning_color = "green"
+        self.history = [
+            {"number": 7, "color": "red"},
+            {"number": 20, "color": "black"},
+            {"number": 0, "color": "green"},
+            {"number": 32, "color": "red"},
+            {"number": 15, "color": "black"},
+            {"number": 19, "color": "red"},
+            {"number": 26, "color": "black"},
+            {"number": 3, "color": "red"}
+        ]
+        self.bets = {}  # user_id -> bet_dict (ONLY real users!)
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def _determine_winning_number(self) -> int:
+        evil = database.get_evil_mode()
+        real_bets = list(self.bets.values())
+        if not real_bets:
+            return random.choice(ROULETTE_WHEEL_NUMBERS)
+
+        if evil:
+            candidates = list(ROULETTE_WHEEL_NUMBERS)
+            random.shuffle(candidates)
+            best_num = candidates[0]
+            min_payout = float("inf")
+            for n in candidates[:15]:
+                total_payout = 0
+                for b in real_bets:
+                    w, _ = calculate_roulette_win(b["choice"], n, b["bet"])
+                    total_payout += w
+                if total_payout < min_payout:
+                    min_payout = total_payout
+                    best_num = n
+            return best_num
+        else:
+            return random.choice(ROULETTE_WHEEL_NUMBERS)
+
+    def _loop(self):
+        while self.running:
+            time.sleep(0.2)
+            now = time.time()
+            with self.lock:
+                if self.phase == "betting":
+                    if now >= self.phase_end_time:
+                        self.phase = "spinning"
+                        self.total_phase_duration = 6.5
+                        self.phase_end_time = now + 6.5
+                        self.winning_number = self._determine_winning_number()
+                        self.winning_color = get_roulette_color(self.winning_number)
+
+                elif self.phase == "spinning":
+                    if now >= self.phase_end_time:
+                        self.phase = "result"
+                        self.total_phase_duration = 5.0
+                        self.phase_end_time = now + 5.0
+                        self.history.insert(0, {"number": self.winning_number, "color": self.winning_color})
+                        self.history = self.history[:12]
+
+                        for uid, b in self.bets.items():
+                            win_amt, mult = calculate_roulette_win(b["choice"], self.winning_number, b["bet"])
+                            if win_amt > 0:
+                                b["status"] = "won"
+                                b["win"] = win_amt
+                                b["multiplier"] = mult
+                                try:
+                                    database.update_user_balance(uid, win_amt)
+                                    database.record_game(uid, "roulette_online", b["bet"], win_amt, mult)
+                                except Exception:
+                                    pass
+                            else:
+                                b["status"] = "lost"
+                                b["win"] = 0
+                                b["multiplier"] = 0.0
+                                try:
+                                    database.record_game(uid, "roulette_online", b["bet"], 0, 0.0)
+                                except Exception:
+                                    pass
+
+                elif self.phase == "result":
+                    if now >= self.phase_end_time:
+                        self.round_id += 1
+                        self.phase = "betting"
+                        self.total_phase_duration = 15.0
+                        self.phase_end_time = now + 15.0
+                        self.bets.clear()
+
+    def place_bet(self, user_id: int, name: str, username: str, choice: str, choice_label: str, bet: int):
+        with self.lock:
+            if self.phase != "betting":
+                return False, "Stavka qabul qilish vaqti tugadi! G'ildirak aylanmoqda."
+            if user_id in self.bets:
+                return False, "Siz bu raundda allaqachon stavka qildingiz!"
+            user = database.get_or_create_user(user_id)
+            if user["balance"] < bet:
+                return False, "Hisobingizda mablag' yetarli emas!"
+            
+            new_bal = database.update_user_balance(user_id, -bet)
+            self.bets[user_id] = {
+                "user_id": user_id,
+                "name": name or "O'yinchi",
+                "username": username or "",
+                "choice": choice,
+                "choice_label": choice_label or choice,
+                "bet": bet,
+                "win": 0,
+                "multiplier": 0.0,
+                "status": "pending",
+                "is_real": True
+            }
+            return True, new_bal
+
+    def cancel_bet(self, user_id: int):
+        with self.lock:
+            if self.phase != "betting":
+                return False, "G'ildirak aylanayotganda stavkani bekor qilib bo'lmaydi!"
+            if user_id not in self.bets:
+                return False, "Stavka topilmadi!"
+            bet = self.bets[user_id]["bet"]
+            del self.bets[user_id]
+            new_bal = database.update_user_balance(user_id, bet)
+            return True, new_bal
+
+    def get_status(self, current_user_id: int = 0):
+        with self.lock:
+            now = time.time()
+            time_left = max(0.0, round(self.phase_end_time - now, 1))
+            bets_list = list(self.bets.values())
+            bets_list.sort(key=lambda b: (
+                0 if b["user_id"] == current_user_id else 1,
+                -b["bet"]
+            ))
+            return {
+                "round_id": self.round_id,
+                "phase": self.phase,
+                "time_left": time_left,
+                "total_time": self.total_phase_duration,
+                "winning_number": self.winning_number if self.phase in ("spinning", "result") else None,
+                "winning_color": self.winning_color if self.phase in ("spinning", "result") else None,
+                "history": self.history,
+                "bets": bets_list,
+                "user_bet": self.bets.get(current_user_id)
+            }
+
+roulette_room = RouletteLiveRoom()
 
 # ============================================================================
 # 🚀 REAL-TIME SYNCHRONIZED MULTIPLAYER AVIATOR / CRASH LIVE ROOM
@@ -617,6 +785,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             res = aviator_room.get_status(uid)
             return self.send_json({"ok": True, **res})
 
+        elif path == "/api/roulette/status":
+            uid = safe_int(query.get("user_id", [999999])[0], 999999)
+            res = roulette_room.get_status(uid)
+            return self.send_json({"ok": True, **res})
+
         # Instant serving from RAM memory (0.05ms)
         if self.serve_cached(path):
             return
@@ -747,6 +920,25 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": True, "balance": res_or_err})
             else:
                 return self.send_json({"ok": False, "error": res_or_err}, status=400)
+
+        elif path == "/api/roulette/bet":
+            choice = str(data.get("choice") or "red").lower().strip()
+            choice_label = str(data.get("choice_label") or choice)[:50]
+            bet = max(1000, min(10_000_000, safe_int(data.get("bet"), 1000)))
+            name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
+            uname = str(data.get("username") or "")[:40]
+            ok, res_bal_or_err = roulette_room.place_bet(uid, name, uname, choice, choice_label, bet)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_bal_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
+
+        elif path == "/api/roulette/cancel":
+            ok, res_bal_or_err = roulette_room.cancel_bet(uid)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_bal_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
 
         self.send_json({"error": "Not Found"}, status=404)
 

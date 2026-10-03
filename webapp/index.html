@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.6">
+  <link rel="stylesheet" href="style.css?v=4.7">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -143,6 +143,39 @@
           <div class="game-info">
             <div class="g-title">COIN FLIP DUEL</div>
             <div class="g-sub">Online jonli o'yinchilar & Offline tanga</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+        <div class="game-card" data-game="roulette">
+          <div class="game-thumb roulette-thumb">
+            <span class="game-ico">
+              <svg viewBox="0 0 36 36" style="width:38px;height:38px">
+                <defs>
+                  <radialGradient id="gRouletteGold" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#fff275"/>
+                    <stop offset="60%" stop-color="#ffd700"/>
+                    <stop offset="100%" stop-color="#b8860b"/>
+                  </radialGradient>
+                  <linearGradient id="gWheelSlices" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#e74c3c"/>
+                    <stop offset="33%" stop-color="#2c3e50"/>
+                    <stop offset="66%" stop-color="#27ae60"/>
+                    <stop offset="100%" stop-color="#e74c3c"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="18" cy="18" r="16" fill="rgba(255,215,0,0.15)" stroke="rgba(255,215,0,0.5)" stroke-width="1.2"/>
+                <circle cx="18" cy="18" r="14" fill="#141a24" stroke="url(#gRouletteGold)" stroke-width="2"/>
+                <circle cx="18" cy="18" r="10" fill="none" stroke="url(#gWheelSlices)" stroke-width="3" stroke-dasharray="4 2"/>
+                <circle cx="18" cy="18" r="4.5" fill="url(#gRouletteGold)"/>
+                <circle cx="18" cy="18" r="2" fill="#141a24"/>
+                <circle cx="24" cy="15" r="1.8" fill="#ffffff"/>
+              </svg>
+            </span>
+            <span class="rt-tag" style="background:#27ae60;color:#fff;">🟢 100% ONLINE</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">LIVE ROULETTE</div>
+            <div class="g-sub">Faqat online! Real o'yinchilar & Yevropa ruletkasi</div>
             <button class="play-btn">O'YNASH</button>
           </div>
         </div>
@@ -768,6 +801,135 @@
       </div>
     </div>
 
+    <div class="game-arena-view" id="view-roulette" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromRoulette">⬅ Orqaga</button>
+        <span class="arena-title">LIVE ROULETTE</span>
+        <div class="rl-online-badge">🟢 100% REAL ONLINE</div>
+      </div>
+
+      <div class="rl-stage-container">
+        <!-- Live Round & Status Header -->
+        <div class="rl-status-bar">
+          <div class="rl-round-tag" id="rlRoundTag">RAUND #5001</div>
+          <div class="rl-phase-info" id="rlPhaseText">STAVKALAR QABUL QILINMOQDA</div>
+          <div class="rl-timer-pill" id="rlTimerText">15.0s</div>
+        </div>
+
+        <!-- History Strip -->
+        <div class="rl-history-strip" id="rlHistoryStrip">
+          <!-- Filled dynamically with badges -->
+        </div>
+
+        <!-- Wheel Canvas & Result Banner -->
+        <div class="rl-wheel-box">
+          <div class="rl-pointer">
+            <svg viewBox="0 0 24 32" style="width:24px;height:32px;">
+              <polygon points="12,32 2,4 22,4" fill="#ffd700" stroke="#b8860b" stroke-width="1.5"/>
+              <circle cx="12" cy="8" r="3.5" fill="#ffffff"/>
+            </svg>
+          </div>
+          <canvas id="rouletteCanvas" width="340" height="340"></canvas>
+          <div class="rl-winning-overlay" id="rlWinningOverlay" style="display:none;">
+            <div class="rl-win-num-badge" id="rlWinNumBadge">7</div>
+            <div class="rl-win-label" id="rlWinLabel">QIZIL</div>
+          </div>
+        </div>
+
+        <!-- Main Betting Board -->
+        <div class="rl-board-wrap">
+          <div class="rl-board-title">STAVKA TURINI TANLANG:</div>
+          <!-- Big 3: Red, Green (Zero), Black -->
+          <div class="rl-main-choices">
+            <button class="rl-choice-card rl-choice-red active" data-choice="red" data-label="🔴 QIZIL (x2.0)">
+              <span class="rl-cc-ico">🔴</span>
+              <span class="rl-cc-title">QIZIL</span>
+              <span class="rl-cc-rate">x2.00</span>
+            </button>
+            <button class="rl-choice-card rl-choice-green" data-choice="zero" data-label="🟢 ZERO [0] (x36.0)">
+              <span class="rl-cc-ico">🟢</span>
+              <span class="rl-cc-title">ZERO (0)</span>
+              <span class="rl-cc-rate">x36.00</span>
+            </button>
+            <button class="rl-choice-card rl-choice-black" data-choice="black" data-label="⚫ QORA (x2.0)">
+              <span class="rl-cc-ico">⚫</span>
+              <span class="rl-cc-title">QORA</span>
+              <span class="rl-cc-rate">x2.00</span>
+            </button>
+          </div>
+
+          <!-- Secondary Grid Choices (Even, Odd, Low, High, Dozens) -->
+          <div class="rl-sub-choices">
+            <button class="rl-sub-btn" data-choice="even" data-label="JUFT (x2.0)">JUFT (x2)</button>
+            <button class="rl-sub-btn" data-choice="odd" data-label="TOQ (x2.0)">TOQ (x2)</button>
+            <button class="rl-sub-btn" data-choice="low" data-label="1-18 (x2.0)">1-18 (x2)</button>
+            <button class="rl-sub-btn" data-choice="high" data-label="19-36 (x2.0)">19-36 (x2)</button>
+            <button class="rl-sub-btn" data-choice="doz1" data-label="1-12 (x3.0)">1-12 (x3)</button>
+            <button class="rl-sub-btn" data-choice="doz2" data-label="13-24 (x3.0)">13-24 (x3)</button>
+            <button class="rl-sub-btn" data-choice="doz3" data-label="25-36 (x3.0)">25-36 (x3)</button>
+          </div>
+
+          <!-- Quick Number Grid (0 to 36) -->
+          <details class="rl-numbers-accordion">
+            <summary class="rl-numbers-summary">🎯 Yagona sonni tanlash (x36.0 yutuq)</summary>
+            <div class="rl-numbers-grid" id="rlNumbersGrid">
+              <!-- Dynamically populated 0-36 buttons -->
+            </div>
+          </details>
+
+          <!-- Current Selection Indicator -->
+          <div class="rl-current-selection">
+            <span>Tanlangan stavka:</span>
+            <strong id="rlSelectedLabel">🔴 QIZIL (x2.00)</strong>
+          </div>
+        </div>
+
+        <!-- Real-Time Online Players Table (ZERO mock users) -->
+        <div class="cf-live-bets-card rl-live-card">
+          <div class="cf-live-header">
+            <div class="cf-live-title">
+              <span class="pulse-dot"></span>
+              JONLI REAL O'YINCHILAR (<span id="rlTotalPlayers">0</span>)
+            </div>
+            <div class="cf-live-pool" id="rlTotalPool">BANK: 0 UZS</div>
+          </div>
+          <div class="cf-live-table" id="rlLiveBetsTable">
+            <div class="cr-empty-bets">
+              <div class="cr-empty-icon">👥</div>
+              <div class="cr-empty-title">Hozircha hech kim stavka qilmadi</div>
+              <div class="cr-empty-desc">Ushbu raundda birinchi bo'lib stavka qiling!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arena-footer">
+        <div class="betting-box" id="rlBettingBox">
+          <div class="bet-row">
+            <span class="b-lbl">Stavka:</span>
+            <div class="b-input-wrap">
+              <button class="btn-b-step" id="rlMinus">-</button>
+              <input type="number" id="rlBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+              <span class="b-curr">UZS</span>
+              <button class="btn-b-step" id="rlPlus">+</button>
+            </div>
+            <button class="btn-b-mod" id="rlHalf">/2</button>
+            <button class="btn-b-mod" id="rlDouble">x2</button>
+            <button class="btn-b-mod" id="rlMax">MAX</button>
+          </div>
+          <div class="chips-row">
+            <button class="b-chip" data-v="1000">1K</button>
+            <button class="b-chip" data-v="5000">5K</button>
+            <button class="b-chip" data-v="10000">10K</button>
+            <button class="b-chip" data-v="25000">25K</button>
+            <button class="b-chip" data-v="50000">50K</button>
+            <button class="b-chip" data-v="100000">100K</button>
+          </div>
+          <button class="btn-play-game" id="rlActionBtn">STAVKA QILISH (ONLINE)</button>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-tasks">
       <div class="section-card tasks-card">
         <div class="tasks-cycle-banner">
@@ -893,6 +1055,6 @@
 
   </div>
 
-  <script src="game.js?v=4.6"></script>
+  <script src="game.js?v=4.7"></script>
 </body>
 </html>
