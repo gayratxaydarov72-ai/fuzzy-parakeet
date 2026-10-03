@@ -592,6 +592,16 @@ function formatMoney(n) {
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 (function restoreCachedBalance() {
   try {
     const cached = safeStorage.getItem("nv_cached_balance");
@@ -4610,7 +4620,8 @@ function renderRouletteLiveBets(bets, currentUserBet) {
   table.innerHTML = safeBets.map(b => {
     const isMe = b.user_id === USER_ID;
     const initial = (b.name || "O")[0].toUpperCase();
-    const uname = b.username ? `@${b.username}` : (b.name || "O'yinchi");
+    const displayName = b.name || "O'yinchi";
+    const userTag = b.username ? `@${b.username}` : `ID: ${b.user_id}`;
 
     let chipClass = "chip-other";
     const ch = (b.choice || "").toLowerCase();
@@ -4624,6 +4635,7 @@ function renderRouletteLiveBets(bets, currentUserBet) {
       rowClass += " won";
       statusHtml = `<span class="rl-status-won">+${formatMoney(b.win)} UZS (${(b.multiplier || 2).toFixed(1)}x)</span>`;
     } else if (b.status === "lost") {
+      rowClass += " lost";
       statusHtml = `<span class="rl-status-lost">-${formatMoney(b.bet)} UZS</span>`;
     } else {
       statusHtml = `<span class="rl-status-waiting">⏳ Kutilmoqda</span>`;
@@ -4636,12 +4648,13 @@ function renderRouletteLiveBets(bets, currentUserBet) {
         <div class="u-info">
           <div class="u-avatar ${isMe ? 'me-avatar' : ''}">${initial}</div>
           <div class="u-names">
-            <span class="u-name">${uname}</span>
+            <span class="u-name">${escapeHtml(displayName)}</span>
+            <span class="u-username-tag">${escapeHtml(userTag)}</span>
             ${isMe ? '<span class="u-you-tag">★ SIZ</span>' : ''}
           </div>
         </div>
         <div>
-          <span class="rl-bet-badge ${chipClass}">${b.choice_label || b.choice}</span>
+          <span class="rl-bet-badge ${chipClass}">${escapeHtml(b.choice_label || b.choice)}</span>
         </div>
         <div class="rl-bet-amt">${formatMoney(b.bet)} UZS</div>
         <div>${statusHtml}</div>
@@ -4676,6 +4689,10 @@ async function fetchRouletteStatus() {
     appState.rl.phase = data.phase;
     appState.rl.timeLeft = data.time_left;
     appState.rl.myBetPlaced = Boolean(data.user_bet);
+
+    if (typeof data.balance === "number") {
+      updateBalanceUI(data.balance);
+    }
 
     const roundTag = document.getElementById("rlRoundTag");
     if (roundTag) roundTag.textContent = `RAUND #${data.round_id}`;
@@ -4761,6 +4778,9 @@ async function fetchRouletteStatus() {
             audio.play("boom");
             triggerHaptic("error");
             showToast(`❌ Yutuq chiqmadi (-${formatMoney(data.user_bet.bet)} UZS)`, false);
+          }
+          if (typeof data.balance === "number") {
+            updateBalanceUI(data.balance);
           }
           apiFetch(`/api/user-status?user_id=${USER_ID}`).then(u => {
             if (u?.ok && typeof u.balance === "number") updateBalanceUI(u.balance);

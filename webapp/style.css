@@ -3711,6 +3711,15 @@ button, input, select, textarea {
   text-overflow: ellipsis;
 }
 
+.u-username-tag {
+  font-size: 9px;
+  color: #7b94ad;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .u-you-tag {
   font-size: 8px;
   font-weight: 800;

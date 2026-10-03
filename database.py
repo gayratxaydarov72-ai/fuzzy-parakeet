@@ -107,12 +107,18 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS promocodes (
             code TEXT PRIMARY KEY,
-            amount INTEGER NOT NULL,
+            amount BIGINT NOT NULL,
             max_uses INTEGER DEFAULT 100,
             used_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
+        if USE_POSTGRES:
+            try:
+                cur.execute("ALTER TABLE promocodes ALTER COLUMN amount TYPE BIGINT;")
+                cur.execute("ALTER TABLE users ALTER COLUMN balance TYPE BIGINT;")
+            except Exception:
+                pass
         cur.execute("""
         CREATE TABLE IF NOT EXISTS promo_uses (
             id SERIAL PRIMARY KEY,
@@ -325,6 +331,12 @@ def get_user(user_id: int):
         USER_CACHE[user_id] = {"data": u, "ts": now}
     return u
 
+def get_user_by_username(username: str):
+    clean = str(username).strip().lstrip("@").lower()
+    if not clean:
+        return None
+    return exec_query("SELECT * FROM users WHERE LOWER(username) = ? LIMIT 1", (clean,), fetch_one=True)
+
 def is_user_banned(user_id: int):
     user = get_user(user_id)
     if user and user.get("is_banned") == 1:
@@ -390,14 +402,26 @@ def get_all_user_ids():
 
 def set_user_balance(user_id: int, balance: int):
     invalidate_user_cache(user_id)
-    exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (max(0, balance), user_id), commit=True)
+    target_bal = max(0, int(balance))
+    exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (target_bal, user_id), commit=True)
     user = get_user(user_id)
-    return user["balance"] if user else balance
+    if not user:
+        get_or_create_user(user_id)
+        exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (target_bal, user_id), commit=True)
+        return target_bal
+    return user["balance"] if user else target_bal
 
 def add_user_balance(user_id: int, amount: int):
     invalidate_user_cache(user_id)
-    exec_query("UPDATE users SET balance = MAX(0, balance + ?) WHERE user_id = ?", (amount, user_id), commit=True)
+    exec_query(
+        "UPDATE users SET balance = CASE WHEN (balance + ?) < 0 THEN 0 ELSE (balance + ?) END WHERE user_id = ?",
+        (amount, amount, user_id),
+        commit=True
+    )
     user = get_user(user_id)
+    if not user:
+        get_or_create_user(user_id)
+        return add_user_balance(user_id, amount)
     return user["balance"] if user else amount
 
 def get_or_create_user(user_id: int, first_name: str = "", username: str = "", referrer_id: int = None, return_is_new: bool = False):

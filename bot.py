@@ -207,9 +207,14 @@ async def check_ban(user_id: int, bot: Bot, chat_id: int) -> bool:
         return True
     return False
 
-def get_main_keyboard(user_id: int):
+def get_main_keyboard(user_id: int, first_name: str = "", username: str = ""):
     live_url = get_live_url()
-    launch_url = f"{live_url}?uid={user_id}"
+    params = [f"uid={user_id}"]
+    if first_name:
+        params.append(f"name={urllib.parse.quote(str(first_name))}")
+    if username:
+        params.append(f"user={urllib.parse.quote(str(username))}")
+    launch_url = f"{live_url}?{'&'.join(params)}"
     is_https = launch_url.lower().startswith("https://")
     
     if is_https:
@@ -255,7 +260,12 @@ def get_admin_keyboard():
                 InlineKeyboardButton(text=rng_text, callback_data="admin_toggle_aviator_rng")
             ],
             [
-                InlineKeyboardButton(text="✏️ RNG Koeffitsiyentni o'zgartirish (Merge)", callback_data="admin_ask_aviator_target")
+                InlineKeyboardButton(text="🎯 Aviator Koeffitsiyent (x)", callback_data="admin_ask_aviator_target"),
+                InlineKeyboardButton(text="🎁 Promokod yaratish", callback_data="admin_ask_newpromo")
+            ],
+            [
+                InlineKeyboardButton(text="💰 Balans o'rnatish", callback_data="admin_ask_setbal"),
+                InlineKeyboardButton(text="➕ Balans qo'shish", callback_data="admin_ask_addbal")
             ],
             [
                 InlineKeyboardButton(text="📊 Yangilash", callback_data="admin_refresh"),
@@ -432,48 +442,212 @@ async def user_info_cmd(message: types.Message, command: CommandObject):
     ).replace(",", " ")
     await message.answer(text, parse_mode="HTML")
 
+def parse_amount(val_str: str) -> int:
+    if not val_str:
+        return 0
+    clean = str(val_str).strip().replace(" ", "").replace(",", "").replace("_", "").lower()
+    is_neg = False
+    if clean.startswith("-"):
+        is_neg = True
+        clean = clean[1:]
+    elif clean.startswith("+"):
+        clean = clean[1:]
+
+    mult = 1
+    if clean.endswith("k") or clean.endswith("ming"):
+        mult = 1_000
+        clean = clean[:-1] if clean.endswith("k") else clean[:-4]
+    elif clean.endswith("m") or clean.endswith("mln"):
+        mult = 1_000_000
+        clean = clean[:-1] if clean.endswith("m") else clean[:-3]
+    elif clean.endswith("b") or clean.endswith("mlrd"):
+        mult = 1_000_000_000
+        clean = clean[:-1] if clean.endswith("b") else clean[:-4]
+
+    try:
+        f = float(clean)
+        res = int(f * mult)
+        return -res if is_neg else res
+    except (ValueError, TypeError):
+        return 0
+
+def resolve_target_and_amount(admin_id: int, raw_args: str):
+    if not raw_args:
+        return None, None, "Bo'sh qiymat kiritildi"
+    raw = raw_args.strip()
+    parts = raw.split()
+    if not parts:
+        return None, None, "Bo'sh qiymat kiritildi"
+
+    # Case 1: @username
+    if parts[0].startswith("@"):
+        uname = parts[0].lstrip("@")
+        u = database.get_user_by_username(uname)
+        if not u:
+            return None, None, f"@{uname} usernamega ega foydalanuvchi bazadan topilmadi!"
+        amt_str = " ".join(parts[1:])
+        amt = parse_amount(amt_str)
+        return u["user_id"], amt, None
+
+    # Case 2: Only 1 token (e.g. 500000, 1m, 500k) -> applies to admin themselves!
+    if len(parts) == 1:
+        amt = parse_amount(parts[0])
+        return admin_id, amt, None
+
+    # Case 3: First token is user ID (>= 6 digits) and rest is amount
+    if parts[0].isdigit() and len(parts[0]) >= 6:
+        amt_rest = parse_amount(" ".join(parts[1:]))
+        if amt_rest != 0 or parts[1].strip() == "0":
+            return int(parts[0]), amt_rest, None
+
+    # Case 4: Multiple tokens that represent one number with spaces (e.g. 1 000 000)
+    amt_all = parse_amount(raw)
+    if amt_all != 0 or raw.strip() == "0":
+        return admin_id, amt_all, None
+
+    if parts[0].isdigit():
+        return int(parts[0]), parse_amount(" ".join(parts[1:])), None
+
+    return None, None, "Format noto'g'ri. Masalan: <code>/setbal 500000</code> yoki <code>/setbal 123456789 500000</code>"
+
+def is_spaced_number(tokens):
+    if not tokens or not all(t.isdigit() for t in tokens):
+        return False
+    if len(tokens) == 1:
+        return True
+    return len(tokens[0]) <= 3 and all(len(t) == 3 for t in tokens[1:])
+
+def parse_promo_args(raw_str: str):
+    parts = raw_str.strip().split()
+    if not parts:
+        return None
+    code = parts[0].upper().strip()
+    if len(parts) < 2:
+        return None
+
+    tokens = parts[1:]
+    uses = 100
+
+    if len(tokens) >= 2 and tokens[-1].isdigit():
+        if is_spaced_number(tokens):
+            amount = parse_amount("".join(tokens))
+            uses = 100
+        else:
+            uses = max(1, int(tokens[-1]))
+            amount = parse_amount(" ".join(tokens[:-1]))
+    else:
+        amount = parse_amount(" ".join(tokens))
+
+    return code, amount, uses
+
+@dp.message(Command("cancel"))
+async def cancel_cmd(message: types.Message):
+    if message.from_user.id in ADMIN_AWAITING_INPUT:
+        ADMIN_AWAITING_INPUT.pop(message.from_user.id, None)
+        await message.answer("🚫 Kiritish bekor qilindi.", reply_markup=get_admin_keyboard() if is_admin(message.from_user.id) else None)
+
 @dp.message(Command("setbal"))
 async def setbal_cmd(message: types.Message, command: CommandObject, bot: Bot):
     if not is_admin(message.from_user.id):
         return
-    args = (command.args or "").split()
-    if len(args) < 2 or not args[0].isdigit() or not args[1].lstrip('-').isdigit():
-        await message.answer("Foydalanish: <code>/setbal &lt;user_id&gt; &lt;summa&gt;</code>\nMasalan: <code>/setbal 123456789 25000</code>", parse_mode="HTML")
-        return
-    target_id = int(args[0])
-    amt = int(args[1])
-    new_bal = database.set_user_balance(target_id, amt)
-    try:
-        await bot.send_message(
-            chat_id=target_id,
-            text=f"💳 <b>Hisob balansingiz yangilandi!</b>\n\nJoriy balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+    raw = (command.args or "").strip()
+    if not raw:
+        await message.answer(
+            "💰 <b>Balansni o'rnatish buyrug'i:</b>\n\n"
+            "Formatlar:\n"
+            "• <b>O'zingiz uchun:</b> <code>/setbal 500000</code> yoki <code>/setbal 1m</code> yoki <code>/setbal 10 000 000</code>\n"
+            "• <b>Boshqa o'yinchi ID orqali:</b> <code>/setbal 123456789 500000</code>\n"
+            "• <b>Username orqali:</b> <code>/setbal @username 1000000</code>\n\n"
+            "<i>(Istalgan summani kiritishingiz mumkin: 50k, 1m, 10 000 000)</i>",
             parse_mode="HTML"
         )
-    except Exception:
-        pass
-    await message.answer(f"✅ <b>Foydalanuvchi {target_id} balansi o'rnatildi:</b> {new_bal:,} UZS".replace(",", " "), parse_mode="HTML")
+        return
+
+    target_id, amt, err = resolve_target_and_amount(message.from_user.id, raw)
+    if err:
+        await message.answer(f"❌ {err}", parse_mode="HTML")
+        return
+    if amt is None or amt < 0:
+        await message.answer("❌ Noto'g'ri summa kiritildi! Masalan: <code>/setbal 500000</code>", parse_mode="HTML")
+        return
+
+    new_bal = database.set_user_balance(target_id, amt)
+    is_self = (target_id == message.from_user.id)
+
+    if not is_self:
+        try:
+            await bot.send_message(
+                chat_id=target_id,
+                text=f"💳 <b>Hisob balansingiz yangilandi!</b>\n\nJoriy balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+    target_user = database.get_user(target_id)
+    u_name = target_user.get("first_name", "O'yinchi") if target_user else str(target_id)
+    u_tag = f" (@{target_user.get('username')})" if target_user and target_user.get('username') else ""
+    target_desc = "O'zingizning hisobingiz" if is_self else f"<b>{u_name}</b>{u_tag} (ID: <code>{target_id}</code>)"
+
+    await message.answer(
+        f"✅ <b>Balans muvaffaqiyatli o'rnatildi!</b>\n\n"
+        f"• Foydalanuvchi: {target_desc}\n"
+        f"• Yangi balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+        parse_mode="HTML"
+    )
 
 @dp.message(Command("addbal"))
 async def addbal_cmd(message: types.Message, command: CommandObject, bot: Bot):
     if not is_admin(message.from_user.id):
         return
-    args = (command.args or "").split()
-    if len(args) < 2 or not args[0].isdigit() or not args[1].lstrip('-').isdigit():
-        await message.answer("Foydalanish: <code>/addbal &lt;user_id&gt; &lt;summa&gt;</code>\nMasalan: <code>/addbal 123456789 10000</code>", parse_mode="HTML")
-        return
-    target_id = int(args[0])
-    diff = int(args[1])
-    new_bal = database.add_user_balance(target_id, diff)
-    prefix = "+" if diff >= 0 else ""
-    try:
-        await bot.send_message(
-            chat_id=target_id,
-            text=f"💳 <b>Hisobingizga {prefix}{diff:,} UZS kiritildi!</b>\n\nJoriy balansingiz: <b>{new_bal:,} UZS</b>".replace(",", " "),
+    raw = (command.args or "").strip()
+    if not raw:
+        await message.answer(
+            "➕ <b>Balansga summa qo'shish buyrug'i:</b>\n\n"
+            "Formatlar:\n"
+            "• <b>O'zingiz uchun:</b> <code>/addbal 50000</code> yoki <code>/addbal 500k</code> yoki <code>/addbal 1 000 000</code>\n"
+            "• <b>Boshqa o'yinchi ID orqali:</b> <code>/addbal 123456789 50000</code>\n"
+            "• <b>Username orqali:</b> <code>/addbal @username 100k</code>\n"
+            "• <b>Ayirish (ayirish uchun minus qo'ying):</b> <code>/addbal -20000</code>\n\n"
+            "<i>(Istalgan summani kiritishingiz mumkin: 50k, 1m, 10 000 000)</i>",
             parse_mode="HTML"
         )
-    except Exception:
-        pass
-    await message.answer(f"✅ <b>Foydalanuvchi {target_id} balansiga {prefix}{diff:,} UZS kiritildi!</b>\nYangi balans: {new_bal:,} UZS".replace(",", " "), parse_mode="HTML")
+        return
+
+    target_id, diff, err = resolve_target_and_amount(message.from_user.id, raw)
+    if err:
+        await message.answer(f"❌ {err}", parse_mode="HTML")
+        return
+    if diff is None:
+        await message.answer("❌ Noto'g'ri summa kiritildi! Masalan: <code>/addbal 50000</code>", parse_mode="HTML")
+        return
+
+    new_bal = database.add_user_balance(target_id, diff)
+    prefix = "+" if diff >= 0 else ""
+    is_self = (target_id == message.from_user.id)
+
+    if not is_self:
+        try:
+            await bot.send_message(
+                chat_id=target_id,
+                text=f"💳 <b>Hisobingizga {prefix}{diff:,} UZS kiritildi!</b>\n\nJoriy balansingiz: <b>{new_bal:,} UZS</b>".replace(",", " "),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+    target_user = database.get_user(target_id)
+    u_name = target_user.get("first_name", "O'yinchi") if target_user else str(target_id)
+    u_tag = f" (@{target_user.get('username')})" if target_user and target_user.get('username') else ""
+    target_desc = "O'zingizning hisobingiz" if is_self else f"<b>{u_name}</b>{u_tag} (ID: <code>{target_id}</code>)"
+
+    await message.answer(
+        f"✅ <b>Balansga mablag' o'tkazildi!</b>\n\n"
+        f"• Foydalanuvchi: {target_desc}\n"
+        f"• O'zgarish: <b>{prefix}{diff:,} UZS</b>\n"
+        f"• Yangi balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+        parse_mode="HTML"
+    )
 
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: types.Message, command: CommandObject, bot: Bot):
@@ -514,17 +688,37 @@ async def newpromo_cmd(message: types.Message, command: CommandObject):
     if not is_admin(message.from_user.id):
         return
 
-    args = (command.args or "").split()
-    if len(args) < 2:
-        await message.answer("Foydalanish: <code>/newpromo KOD SUMMA [ISHLATISH_SONI]</code>\nMasalan: <code>/newpromo NVVIP 5000 50</code>", parse_mode="HTML")
+    raw = (command.args or "").strip()
+    if not raw:
+        await message.answer(
+            "🎁 <b>Yangi promokod yaratish:</b>\n\n"
+            "Format: <code>/newpromo &lt;KOD&gt; &lt;SUMMA&gt; [SONI]</code>\n\n"
+            "<b>Misollar:</b>\n"
+            "• <code>/newpromo NVVIP 50000 100</code> (50 ming UZS, 100 ta)\n"
+            "• <code>/newpromo MEGA1M 1000000</code> (1 mln UZS, 100 ta)\n"
+            "• <code>/newpromo SUPER 500k 50</code> (500 ming UZS, 50 ta)\n"
+            "• <code>/newpromo BONUS10M 10m 20</code> (10 mln UZS, 20 ta)\n"
+            "• <code>/newpromo OLTIN 1 000 000 200</code>\n\n"
+            "<i>(Summani xohlagancha qo'yishingiz mumkin, chegara yo'q!)</i>",
+            parse_mode="HTML"
+        )
         return
 
-    code = args[0]
-    amount = int(args[1])
-    uses = int(args[2]) if len(args) > 2 else 100
+    parsed = parse_promo_args(raw)
+    if not parsed or parsed[1] <= 0:
+        await message.answer("❌ Noto'g'ri format yoki summa! Masalan: <code>/newpromo BONUS 50000 100</code>", parse_mode="HTML")
+        return
 
+    code, amount, uses = parsed
     database.create_promocode(code, amount, uses)
-    await message.answer(f"✅ Promokod yaratildi:\nKod: <b>{code.upper()}</b>\nSumma: <b>{amount:,} UZS</b>\nSoni: <b>{uses}</b>".replace(",", " "), parse_mode="HTML")
+    await message.answer(
+        f"✅ <b>Yangi promokod muvaffaqiyatli yaratildi!</b>\n\n"
+        f"• Promokod kodi: <code>{code}</code>\n"
+        f"• Beriladigan summa: <b>{amount:,} UZS</b>\n"
+        f"• Ishlatish limiti: <b>{uses:,} ta</b>\n\n"
+        f"<i>Foydalanuvchilar bot yoki WebApp orqali faollashtirishi mumkin!</i>".replace(",", " "),
+        parse_mode="HTML"
+    )
 
 @dp.message(Command("seturl"))
 async def seturl_cmd(message: types.Message, command: CommandObject):
@@ -629,6 +823,61 @@ async def admin_url_info_callback(call: types.CallbackQuery):
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
+@dp.callback_query(F.data == "admin_ask_setbal")
+async def admin_ask_setbal_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    ADMIN_AWAITING_INPUT[call.from_user.id] = "setbal"
+    await call.message.answer(
+        "💰 <b>FOYDALANUVCHI BALANSINI O'RNATISH:</b>\n\n"
+        "Quyidagilardan birini chatga yuboring:\n"
+        "• <b>O'zingiz uchun:</b> <code>500000</code> yoki <code>1m</code> yoki <code>10 000 000</code>\n"
+        "• <b>Boshqa o'yinchi ID orqali:</b> <code>123456789 500000</code>\n"
+        "• <b>Username orqali:</b> <code>@foydalanuvchi 1000000</code>\n\n"
+        "<i>(Bekor qilish uchun /cancel deb yozing)</i>",
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "admin_ask_addbal")
+async def admin_ask_addbal_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    ADMIN_AWAITING_INPUT[call.from_user.id] = "addbal"
+    await call.message.answer(
+        "➕ <b>BALANSGA SUMMA QO'SHISH:</b>\n\n"
+        "Quyidagilardan birini chatga yuboring:\n"
+        "• <b>O'zingiz uchun:</b> <code>50000</code> yoki <code>500k</code> yoki <code>1 000 000</code>\n"
+        "• <b>Boshqa o'yinchi ID orqali:</b> <code>123456789 50000</code>\n"
+        "• <b>Username orqali:</b> <code>@foydalanuvchi 100k</code>\n"
+        "• <b>Ayirish (ayirish uchun minus):</b> <code>-25000</code>\n\n"
+        "<i>(Bekor qilish uchun /cancel deb yozing)</i>",
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "admin_ask_newpromo")
+async def admin_ask_newpromo_callback(call: types.CallbackQuery):
+    if not is_admin(call.from_user.id):
+        await call.answer("Ruxsat yo'q!", show_alert=True)
+        return
+    ADMIN_AWAITING_INPUT[call.from_user.id] = "newpromo"
+    await call.message.answer(
+        "🎁 <b>YANGI PROMOKOD YARATISH:</b>\n\n"
+        "Format: <code>KOD SUMMA [SONI]</code>\n\n"
+        "<b>Misollar:</b>\n"
+        "• <code>NVVIP 50000 100</code> (50 ming UZS, 100 ta)\n"
+        "• <code>MEGA1M 1000000</code> (1 mln UZS, 100 ta)\n"
+        "• <code>SUPER 500k 50</code> (500 ming UZS, 50 ta)\n"
+        "• <code>BONUS10M 10m 20</code> (10 mln UZS, 20 ta)\n"
+        "• <code>OLTIN 1 000 000 200</code>\n\n"
+        "<i>(Xohlagancha summa belgilashingiz mumkin, bekor qilish uchun /cancel)</i>",
+        parse_mode="HTML"
+    )
+    await call.answer()
+
 ADMIN_AWAITING_INPUT = {}
 
 @dp.message(F.text & ~F.text.startswith("/"))
@@ -636,6 +885,9 @@ async def admin_input_handler(message: types.Message):
     if not is_admin(message.from_user.id):
         return
     state = ADMIN_AWAITING_INPUT.get(message.from_user.id)
+    if not state:
+        return
+
     if state == "aviator_target":
         raw = message.text.strip().lower().replace("x", "").replace(",", ".")
         try:
@@ -657,6 +909,87 @@ async def admin_input_handler(message: types.Message):
                 "❌ <b>Noto'g'ri qiymat kiritildi!</b>\nIltimos, son kiriting. Masalan: <code>1.5</code> yoki <code>0.5</code> yoki <code>1.2x</code>",
                 parse_mode="HTML"
             )
+
+    elif state == "setbal":
+        raw = message.text.strip()
+        target_id, amt, err = resolve_target_and_amount(message.from_user.id, raw)
+        if err or amt is None or amt < 0:
+            await message.answer(f"❌ Xatolik: {err or 'Noto`g`ri summa'}\nIltimos, qaytadan yuboring yoki /cancel bosing:", parse_mode="HTML")
+            return
+        ADMIN_AWAITING_INPUT.pop(message.from_user.id, None)
+        new_bal = database.set_user_balance(target_id, amt)
+        is_self = (target_id == message.from_user.id)
+        if not is_self:
+            try:
+                await message.bot.send_message(
+                    chat_id=target_id,
+                    text=f"💳 <b>Hisob balansingiz yangilandi!</b>\n\nJoriy balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+        target_user = database.get_user(target_id)
+        u_name = target_user.get("first_name", "O'yinchi") if target_user else str(target_id)
+        u_tag = f" (@{target_user.get('username')})" if target_user and target_user.get('username') else ""
+        target_desc = "O'zingizning hisobingiz" if is_self else f"<b>{u_name}</b>{u_tag} (ID: <code>{target_id}</code>)"
+        await message.answer(
+            f"✅ <b>Balans muvaffaqiyatli o'rnatildi!</b>\n\n"
+            f"• Foydalanuvchi: {target_desc}\n"
+            f"• Yangi balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+            parse_mode="HTML",
+            reply_markup=get_admin_keyboard()
+        )
+
+    elif state == "addbal":
+        raw = message.text.strip()
+        target_id, diff, err = resolve_target_and_amount(message.from_user.id, raw)
+        if err or diff is None:
+            await message.answer(f"❌ Xatolik: {err or 'Noto`g`ri summa'}\nIltimos, qaytadan yuboring yoki /cancel bosing:", parse_mode="HTML")
+            return
+        ADMIN_AWAITING_INPUT.pop(message.from_user.id, None)
+        new_bal = database.add_user_balance(target_id, diff)
+        prefix = "+" if diff >= 0 else ""
+        is_self = (target_id == message.from_user.id)
+        if not is_self:
+            try:
+                await message.bot.send_message(
+                    chat_id=target_id,
+                    text=f"💳 <b>Hisobingizga {prefix}{diff:,} UZS kiritildi!</b>\n\nJoriy balansingiz: <b>{new_bal:,} UZS</b>".replace(",", " "),
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+        target_user = database.get_user(target_id)
+        u_name = target_user.get("first_name", "O'yinchi") if target_user else str(target_id)
+        u_tag = f" (@{target_user.get('username')})" if target_user and target_user.get('username') else ""
+        target_desc = "O'zingizning hisobingiz" if is_self else f"<b>{u_name}</b>{u_tag} (ID: <code>{target_id}</code>)"
+        await message.answer(
+            f"✅ <b>Balansga mablag' o'tkazildi!</b>\n\n"
+            f"• Foydalanuvchi: {target_desc}\n"
+            f"• O'zgarish: <b>{prefix}{diff:,} UZS</b>\n"
+            f"• Yangi balans: <b>{new_bal:,} UZS</b>".replace(",", " "),
+            parse_mode="HTML",
+            reply_markup=get_admin_keyboard()
+        )
+
+    elif state == "newpromo":
+        raw = message.text.strip()
+        parsed = parse_promo_args(raw)
+        if not parsed or parsed[1] <= 0:
+            await message.answer("❌ Noto'g'ri format yoki summa!\nFormat: <code>KOD SUMMA [SONI]</code>\nMasalan: <code>VIP 50000 100</code>\nQaytadan yuboring yoki /cancel bosing:", parse_mode="HTML")
+            return
+        code, amount, uses = parsed
+        ADMIN_AWAITING_INPUT.pop(message.from_user.id, None)
+        database.create_promocode(code, amount, uses)
+        await message.answer(
+            f"✅ <b>Yangi promokod muvaffaqiyatli yaratildi!</b>\n\n"
+            f"• Promokod kodi: <code>{code}</code>\n"
+            f"• Beriladigan summa: <b>{amount:,} UZS</b>\n"
+            f"• Ishlatish limiti: <b>{uses:,} ta</b>\n\n"
+            f"<i>Foydalanuvchilar bot yoki WebApp orqali faollashtirishi mumkin!</i>".replace(",", " "),
+            parse_mode="HTML",
+            reply_markup=get_admin_keyboard()
+        )
 
 @dp.message(Command("evil"))
 async def evil_cmd(message: types.Message, command: CommandObject):
@@ -845,7 +1178,12 @@ async def command_start_handler(message: types.Message, command: CommandObject, 
             pass
 
     live_url = get_live_url()
-    launch_url = f"{live_url}?uid={user_id}"
+    params = [f"uid={user_id}"]
+    if first_name:
+        params.append(f"name={urllib.parse.quote(str(first_name))}")
+    if username:
+        params.append(f"user={urllib.parse.quote(str(username))}")
+    launch_url = f"{live_url}?{'&'.join(params)}"
     try:
         if launch_url.lower().startswith("https://"):
             await bot.set_chat_menu_button(
@@ -901,7 +1239,7 @@ async def command_start_handler(message: types.Message, command: CommandObject, 
         await message.answer(
             text=welcome_text,
             parse_mode="HTML",
-            reply_markup=get_main_keyboard(user_id)
+            reply_markup=get_main_keyboard(user_id, first_name, username)
         )
     except Exception:
         fallback_kb = InlineKeyboardMarkup(

@@ -370,10 +370,19 @@ class RouletteLiveRoom:
                 return False, "Hisobingizda mablag' yetarli emas!"
             
             new_bal = database.update_user_balance(user_id, -bet)
+
+            # High-priority user resolution:
+            p_name = (name or "").strip()
+            if not p_name or p_name.lower() in ("o'yinchi", "oyinchi", "player"):
+                p_name = user.get("first_name") or f"O'yinchi #{user_id % 10000}"
+            p_uname = (username or "").strip().lstrip("@")
+            if not p_uname:
+                p_uname = (user.get("username") or "").strip().lstrip("@")
+
             self.bets[user_id] = {
                 "user_id": user_id,
-                "name": name or "O'yinchi",
-                "username": username or "",
+                "name": p_name,
+                "username": p_uname,
                 "choice": choice,
                 "choice_label": choice_label or choice,
                 "bet": bet,
@@ -404,6 +413,11 @@ class RouletteLiveRoom:
                 0 if b["user_id"] == current_user_id else 1,
                 -b["bet"]
             ))
+            curr_bal = None
+            if current_user_id > 0:
+                u = database.get_user(current_user_id)
+                if u:
+                    curr_bal = u.get("balance")
             return {
                 "round_id": self.round_id,
                 "phase": self.phase,
@@ -413,7 +427,8 @@ class RouletteLiveRoom:
                 "winning_color": self.winning_color if self.phase in ("spinning", "result") else None,
                 "history": self.history,
                 "bets": bets_list,
-                "user_bet": self.bets.get(current_user_id)
+                "user_bet": self.bets.get(current_user_id),
+                "balance": curr_bal
             }
 
 roulette_room = RouletteLiveRoom()
@@ -775,6 +790,18 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"ok": False, "banned": True, "error": f"Sizning hisobingiz bloklangan! Sabab: {ban_reason}"}, status=403)
 
             rows = database.exec_query("SELECT * FROM game_history WHERE user_id = ? ORDER BY id DESC LIMIT 20", (uid,), fetch_all=True)
+            return self.send_json({"ok": True, "history": rows or []})
+
+        elif path == "/api/user-status":
+            uid = safe_int(query.get("user_id", [999999])[0], 999999)
+            user = database.get_user(uid)
+            if not user:
+                user = database.get_or_create_user(uid)
+            return self.send_json({
+                "ok": True,
+                "balance": user["balance"] if user else 0,
+                "user": user
+            })
         elif path == "/api/coinflip/status":
             uid = safe_int(query.get("user_id", [999999])[0], 999999)
             res = coinflip_room.get_status(uid)
