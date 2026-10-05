@@ -1404,7 +1404,6 @@ async function finishKamikazeGame(win, winSum = 0, mult = 0) {
     updateBalanceUI(appState.balance + winSum, true);
     showToast(`🎉 +${formatMoney(winSum)} UZS (${mult.toFixed(2)}x) YUTUQ!`, true);
   } else {
-    updateBalanceUI(0, false);
     showToast(`💥 Samolyot portladi! (-${formatMoney(appState.km.bet)} UZS)`, false);
   }
 
@@ -1724,7 +1723,6 @@ async function finishAppleGame(win, winSum = 0, mult = 0) {
     updateBalanceUI(appState.balance + winSum, true);
     showToast(`🍎 +${formatMoney(winSum)} UZS (${mult.toFixed(2)}x) YUTUQ!`, true);
   } else {
-    updateBalanceUI(0, false);
     showToast(`🍏 Zaharli olma chiqdi! (-${formatMoney(appState.ap.bet)} UZS)`, false);
   }
 
@@ -2401,7 +2399,6 @@ async function fetchAviatorOnlineStatus() {
         audio.play("boom");
         triggerHaptic("error");
         if (data.user_bet && !data.user_bet.cashed_out) {
-          updateBalanceUI(0, false);
           showToast(`💥 Samolyot ${(data.crash_point || data.multiplier).toFixed(2)}x da uchib ketdi! (-${formatMoney(data.user_bet.bet)} UZS)`, false);
         }
       }
@@ -2657,7 +2654,6 @@ async function endCrashRound(win) {
   const actionBtn = document.getElementById("crashActionBtn");
 
   if (!appState.cr.userCashedOut) {
-    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -3082,7 +3078,6 @@ async function onMineTileClick(idx) {
 
   if (isMine) {
     appState.mn.playing = false;
-    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -3472,7 +3467,6 @@ async function onThimbleClick(cupIndex) {
     showToast(`🎉 +${formatMoney(winSum)} UZS! To'g'ri topdingiz (x${mult.toFixed(2)})!`, true);
     document.getElementById("thimblesMsg").textContent = `🎉 YUTUQ: +${formatMoney(winSum)} UZS!`;
   } else {
-    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -3708,7 +3702,6 @@ function finishDiceGame(won, mult, sum) {
     }).catch(() => {});
     showToast(`🎉 Yig'indi: ${sum}! +${formatMoney(winSum)} UZS (x${mult.toFixed(2)})`, true);
   } else {
-    updateBalanceUI(0, false);
     triggerScreenShake();
     audio.play("boom");
     triggerHaptic("error");
@@ -4107,7 +4100,6 @@ async function finishSpin(sector, sectorIndex) {
       }
     }).catch(() => {});
   } else {
-    updateBalanceUI(0, false);
     audio.play("boom");
     triggerHaptic("light");
     triggerScreenShake();
@@ -4328,7 +4320,6 @@ async function playCoinFlip() {
         }
       }).catch(() => {});
     } else {
-      updateBalanceUI(0, false);
       audio.play("boom");
       triggerHaptic("error");
       triggerScreenShake();
@@ -4887,7 +4878,6 @@ async function fetchRouletteStatus() {
             fx.confetti();
             showToast(`🎉 G'ALABA! +${formatMoney(data.user_bet.win)} UZS (${(data.user_bet.multiplier || 2).toFixed(1)}x)!`, true);
           } else {
-            updateBalanceUI(0, false);
             audio.play("boom");
             triggerHaptic("error");
             showToast(`❌ Yutuq chiqmadi (-${formatMoney(data.user_bet.bet)} UZS)`, false);

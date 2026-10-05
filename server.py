@@ -160,7 +160,6 @@ class CoinFlipLiveRoom:
                                 b["status"] = "lost"
                                 b["win"] = 0
                                 try:
-                                    database.set_user_balance(uid, 0)
                                     database.record_game(uid, "coinflip_online", b["bet"], 0, 0.0)
                                 except Exception:
                                     pass
@@ -356,7 +355,6 @@ class RouletteLiveRoom:
                                 b["win"] = 0
                                 b["multiplier"] = 0.0
                                 try:
-                                    database.set_user_balance(uid, 0)
                                     database.record_game(uid, "roulette_online", b["bet"], 0, 0.0)
                                 except Exception:
                                     pass
@@ -586,7 +584,6 @@ class AviatorLiveRoom:
                                 b["status"] = "lost"
                                 b["win"] = 0
                                 try:
-                                    database.set_user_balance(uid, 0)
                                     database.record_game(uid, "aviator_online", b["bet"], 0, 0.0)
                                 except Exception:
                                     pass
@@ -966,12 +963,9 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 win = 0
 
-            # 🛑 Yutqazsa puli darhol 0 ga tenglashtiriladi:
-            if win > 0:
-                diff = win - bet
-                new_bal = database.update_user_balance(uid, diff)
-            else:
-                new_bal = database.set_user_balance(uid, 0)
+            # Aniq hisoblash: Yutuq bo'lsa (win - bet) qo'shiladi, yutqazsa faqat tikilgan bet ayriladi:
+            diff = win - bet
+            new_bal = database.update_user_balance(uid, diff)
             phash = database.record_game(uid, game_name, bet, win, mult)
             tasks = database.get_user_tasks(uid)
 
@@ -983,10 +977,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
 
         elif path == "/api/topup":
-            if not security_limiter.is_user_topup_allowed(uid, cooldown_secs=10):
-                return self.send_json({"ok": False, "error": "Hisobni to'ldirish uchun 10 soniya kuting!"}, status=429)
+            if not security_limiter.is_user_topup_allowed(uid, cooldown_secs=5):
+                return self.send_json({"ok": False, "error": "Hisobni to'ldirish uchun biroz kuting!"}, status=429)
             amt = max(1000, min(10000, safe_int(data.get("amount"), 10000)))
             new_bal = database.update_user_balance(uid, amt)
+            return self.send_json({"ok": True, "balance": new_bal, "amount": amt})
         elif path == "/api/coinflip/bet":
             choice = str(data.get("choice") or "heads").lower()
             if choice not in ("heads", "tails"):

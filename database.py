@@ -403,27 +403,26 @@ def get_all_user_ids():
     return [r["user_id"] for r in rows] if rows else []
 
 def set_user_balance(user_id: int, balance: int):
-    invalidate_user_cache(user_id)
     target_bal = max(0, int(balance))
-    exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (target_bal, user_id), commit=True)
     user = get_user(user_id)
     if not user:
         get_or_create_user(user_id)
-        exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (target_bal, user_id), commit=True)
-        return target_bal
+    exec_query("UPDATE users SET balance = ? WHERE user_id = ?", (target_bal, user_id), commit=True)
+    invalidate_user_cache(user_id)
+    user = get_user(user_id)
     return user["balance"] if user else target_bal
 
 def add_user_balance(user_id: int, amount: int):
-    invalidate_user_cache(user_id)
+    user = get_user(user_id)
+    if not user:
+        get_or_create_user(user_id)
     exec_query(
         "UPDATE users SET balance = CASE WHEN (balance + ?) < 0 THEN 0 ELSE (balance + ?) END WHERE user_id = ?",
         (amount, amount, user_id),
         commit=True
     )
+    invalidate_user_cache(user_id)
     user = get_user(user_id)
-    if not user:
-        get_or_create_user(user_id)
-        return add_user_balance(user_id, amount)
     return user["balance"] if user else amount
 
 def get_or_create_user(user_id: int, first_name: str = "", username: str = "", referrer_id: int = None, return_is_new: bool = False):
@@ -612,13 +611,13 @@ def get_all_promocodes():
     return exec_query("SELECT * FROM promocodes ORDER BY created_at DESC", fetch_all=True)
 
 def update_user_balance(user_id: int, diff: int):
-    invalidate_user_cache(user_id)
-    exec_query("UPDATE users SET balance = CASE WHEN (balance + ?) < 0 THEN 0 ELSE (balance + ?) END WHERE user_id = ?", (diff, diff, user_id), commit=True)
     user = get_user(user_id)
     if not user:
         get_or_create_user(user_id)
-        return update_user_balance(user_id, diff)
-    return user["balance"]
+    exec_query("UPDATE users SET balance = CASE WHEN (balance + ?) < 0 THEN 0 ELSE (balance + ?) END WHERE user_id = ?", (diff, diff, user_id), commit=True)
+    invalidate_user_cache(user_id)
+    user = get_user(user_id)
+    return user["balance"] if user else 0
 
 def record_game(user_id: int, game_name: str, bet: int, win: int, multiplier: float):
     seed = f"{user_id}-{game_name}-{time.time()}-{bet}-{win}"

@@ -5,6 +5,7 @@ import logging
 import threading
 from collections import defaultdict
 import time
+import urllib.parse
 from aiogram import Bot, Dispatcher, types, F, BaseMiddleware
 from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import (
