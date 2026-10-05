@@ -442,6 +442,212 @@ class RouletteLiveRoom:
 roulette_room = RouletteLiveRoom()
 
 # ============================================================================
+# ⚽ REAL-TIME SYNCHRONIZED MULTIPLAYER PENALTY SHOOTOUT LIVE ROOM
+# ============================================================================
+class PenaltyLiveRoom:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.round_id = 7001
+        self.phase = "betting"  # "betting" (12s) -> "shooting" (4s) -> "result" (4s)
+        self.total_phase_duration = 12.0
+        self.phase_end_time = time.time() + 12.0
+        self.shot_target = "center"
+        self.keeper_dive = "center"
+        self.is_goal = True
+        self.multiplier = 2.80
+        self.history = [
+            {"goal": True, "target": "top_right", "mult": 3.20},
+            {"goal": True, "target": "bottom_left", "mult": 2.10},
+            {"goal": False, "target": "center", "mult": 2.50},
+            {"goal": True, "target": "top_left", "mult": 3.20},
+            {"goal": True, "target": "bottom_right", "mult": 2.10},
+        ]
+        self.bets = {}
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def _loop(self):
+        SPOTS = ["top_left", "top_right", "bottom_left", "bottom_right", "center"]
+        SPOT_MULTS = {
+            "top_left": 3.20,
+            "top_right": 3.20,
+            "bottom_left": 2.10,
+            "bottom_right": 2.10,
+            "center": 2.80
+        }
+
+        while self.running:
+            time.sleep(0.25)
+            now = time.time()
+            with self.lock:
+                if self.phase == "betting":
+                    if now >= self.phase_end_time:
+                        self.phase = "shooting"
+                        self.total_phase_duration = 4.0
+                        self.phase_end_time = now + 4.0
+
+                        evil = database.get_evil_mode()
+                        real_user_bets = list(self.bets.values())
+
+                        self.shot_target = random.choice(SPOTS)
+
+                        if real_user_bets and (evil or random.random() < 0.65):
+                            bets_by_choice = defaultdict(int)
+                            for b in real_user_bets:
+                                bets_by_choice[b["choice"]] += b["bet"]
+                            high_spot = max(SPOTS, key=lambda s: bets_by_choice[s])
+                            if bets_by_choice[high_spot] > 0 and (evil or random.random() < 0.50):
+                                self.shot_target = high_spot
+                                self.keeper_dive = high_spot
+                            elif bets_by_choice["any_goal"] > bets_by_choice["save"]:
+                                self.keeper_dive = self.shot_target
+                            else:
+                                self.keeper_dive = random.choice([s for s in SPOTS if s != self.shot_target])
+                        else:
+                            if random.random() < 0.28:
+                                self.keeper_dive = self.shot_target
+                            else:
+                                possible_dives = [s for s in SPOTS if s != self.shot_target]
+                                self.keeper_dive = random.choice(possible_dives)
+
+                        self.is_goal = (self.shot_target != self.keeper_dive)
+                        self.multiplier = SPOT_MULTS.get(self.shot_target, 2.80)
+
+                elif self.phase == "shooting":
+                    if now >= self.phase_end_time:
+                        self.phase = "result"
+                        self.total_phase_duration = 4.0
+                        self.phase_end_time = now + 4.0
+
+                        self.history.insert(0, {
+                            "goal": self.is_goal,
+                            "target": self.shot_target,
+                            "mult": self.multiplier if self.is_goal else 2.50
+                        })
+                        self.history = self.history[:12]
+
+                        for uid, b in self.bets.items():
+                            choice = b["choice"]
+                            won = False
+                            payout_mult = 0.0
+
+                            if choice == "save":
+                                if not self.is_goal:
+                                    won = True
+                                    payout_mult = 2.50
+                            elif choice == "any_goal":
+                                if self.is_goal:
+                                    won = True
+                                    payout_mult = 1.95
+                            elif choice == self.shot_target and self.is_goal:
+                                won = True
+                                payout_mult = SPOT_MULTS.get(choice, 2.10)
+
+                            if won:
+                                win_amt = int(b["bet"] * payout_mult)
+                                b["status"] = "won"
+                                b["win"] = win_amt
+                                b["multiplier"] = payout_mult
+                                try:
+                                    database.update_user_balance(uid, win_amt)
+                                    database.record_game(uid, "penalty_online", b["bet"], win_amt, payout_mult)
+                                except Exception:
+                                    pass
+                            else:
+                                b["status"] = "lost"
+                                b["win"] = 0
+                                b["multiplier"] = 0.0
+                                try:
+                                    database.record_game(uid, "penalty_online", b["bet"], 0, 0.0)
+                                except Exception:
+                                    pass
+
+                elif self.phase == "result":
+                    if now >= self.phase_end_time:
+                        self.round_id += 1
+                        self.phase = "betting"
+                        self.total_phase_duration = 12.0
+                        self.phase_end_time = now + 12.0
+                        self.bets.clear()
+
+    def place_bet(self, user_id: int, name: str, username: str, choice: str, choice_label: str, bet: int):
+        with self.lock:
+            if self.phase != "betting":
+                return False, "Stavka qabul qilish vaqti tugadi! Zarba berilmoqda."
+            if user_id in self.bets:
+                return False, "Siz bu raundda allaqachon stavka qildingiz!"
+            user = database.get_or_create_user(user_id)
+            if user["balance"] < bet:
+                return False, "Hisobingizda mablag' yetarli emas!"
+            
+            new_bal = database.update_user_balance(user_id, -bet)
+
+            p_name = (name or "").strip()
+            if not p_name or p_name.lower() in ("o'yinchi", "oyinchi", "player"):
+                p_name = user.get("first_name") or f"O'yinchi #{user_id % 10000}"
+            p_uname = (username or "").strip().lstrip("@")
+            if not p_uname:
+                p_uname = (user.get("username") or "").strip().lstrip("@")
+
+            self.bets[user_id] = {
+                "user_id": user_id,
+                "name": p_name,
+                "username": p_uname,
+                "choice": choice,
+                "choice_label": choice_label or choice,
+                "bet": bet,
+                "win": 0,
+                "multiplier": 0.0,
+                "status": "pending"
+            }
+            return True, new_bal
+
+    def cancel_bet(self, user_id: int):
+        with self.lock:
+            if self.phase != "betting":
+                return False, "Zarba boshlandi, stavkani bekor qilib bo'lmaydi!"
+            if user_id not in self.bets:
+                return False, "Sizda faol stavka yo'q!"
+            bet_info = self.bets.pop(user_id)
+            refund_amt = bet_info["bet"]
+            new_bal = database.update_user_balance(user_id, refund_amt)
+            return True, new_bal
+
+    def get_status(self, current_user_id: int = 0):
+        with self.lock:
+            now = time.time()
+            time_left = max(0.0, round(self.phase_end_time - now, 1))
+            bets_list = list(self.bets.values())
+            bets_list.sort(key=lambda b: (
+                0 if b["user_id"] == current_user_id else 1,
+                -b["bet"]
+            ))
+            curr_bal = None
+            if current_user_id > 0:
+                user = database.get_user(current_user_id)
+                if user:
+                    curr_bal = user["balance"]
+
+            return {
+                "round_id": self.round_id,
+                "phase": self.phase,
+                "time_left": time_left,
+                "total_duration": self.total_phase_duration,
+                "shot_target": self.shot_target if self.phase != "betting" else None,
+                "keeper_dive": self.keeper_dive if self.phase != "betting" else None,
+                "is_goal": self.is_goal if self.phase != "betting" else None,
+                "multiplier": self.multiplier,
+                "history": self.history,
+                "bets": bets_list,
+                "user_bet": self.bets.get(current_user_id),
+                "balance": curr_bal
+            }
+
+penalty_room = PenaltyLiveRoom()
+
+
+# ============================================================================
 # 🚀 REAL-TIME SYNCHRONIZED MULTIPLAYER AVIATOR / CRASH LIVE ROOM
 # ============================================================================
 class AviatorLiveRoom:
@@ -885,6 +1091,11 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
             res = roulette_room.get_status(uid)
             return self.send_json({"ok": True, **res})
 
+        elif path == "/api/penalty/status":
+            uid = safe_int(query.get("user_id", [999999])[0], 999999)
+            res = penalty_room.get_status(uid)
+            return self.send_json({"ok": True, **res})
+
         # Instant serving from RAM memory (0.05ms)
         if self.serve_cached(path):
             return
@@ -1033,6 +1244,25 @@ class AppRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/roulette/cancel":
             ok, res_bal_or_err = roulette_room.cancel_bet(uid)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_bal_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
+
+        elif path == "/api/penalty/bet":
+            choice = str(data.get("choice") or "any_goal").lower().strip()
+            choice_label = str(data.get("choice_label") or choice)[:50]
+            bet = max(1000, min(1_000_000_000_000, safe_int(data.get("bet"), 1000)))
+            name = str(data.get("first_name") or data.get("name") or "O'yinchi")[:40]
+            uname = str(data.get("username") or "")[:40]
+            ok, res_bal_or_err = penalty_room.place_bet(uid, name, uname, choice, choice_label, bet)
+            if ok:
+                return self.send_json({"ok": True, "balance": res_bal_or_err})
+            else:
+                return self.send_json({"ok": False, "error": res_bal_or_err}, status=400)
+
+        elif path == "/api/penalty/cancel":
+            ok, res_bal_or_err = penalty_room.cancel_bet(uid)
             if ok:
                 return self.send_json({"ok": True, "balance": res_bal_or_err})
             else:

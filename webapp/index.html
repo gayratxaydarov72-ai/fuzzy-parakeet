@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5.0">
+  <link rel="stylesheet" href="style.css?v=5.1">
 </head>
 <body>
   <div class="app-container" id="app">
@@ -176,6 +176,29 @@
           <div class="game-info">
             <div class="g-title">LIVE ROULETTE</div>
             <div class="g-sub">Faqat online! Real o'yinchilar & Yevropa ruletkasi</div>
+            <button class="play-btn">O'YNASH</button>
+          </div>
+        </div>
+
+        <div class="game-card" data-game="penalty">
+          <div class="game-thumb penalty-thumb">
+            <span class="game-ico">
+              <svg viewBox="0 0 36 36" style="width:38px;height:38px">
+                <circle cx="18" cy="18" r="16" fill="rgba(46,204,113,0.15)" stroke="rgba(46,204,113,0.5)" stroke-width="1.2"/>
+                <circle cx="18" cy="18" r="13" fill="#ffffff" stroke="#2c3e50" stroke-width="1.2"/>
+                <polygon points="18,12 21,14 20,18 16,18 15,14" fill="#2c3e50"/>
+                <polygon points="18,6 20,9 18,12 15,9" fill="#2c3e50"/>
+                <polygon points="26,11 25,15 21,14 22,10" fill="#2c3e50"/>
+                <polygon points="24,23 20,24 20,18 24,19" fill="#2c3e50"/>
+                <polygon points="12,23 12,19 16,18 16,24" fill="#2c3e50"/>
+                <polygon points="10,11 14,10 15,14 11,15" fill="#2c3e50"/>
+              </svg>
+            </span>
+            <span class="rt-tag" style="background:linear-gradient(90deg, #ff4757, #ff6b81);color:#fff;font-weight:900;">🔥 LIVE / YANGI</span>
+          </div>
+          <div class="game-info">
+            <div class="g-title">PENALTY SHOOTOUT</div>
+            <div class="g-sub">Faqat online! Real penalti seriyasi & x3.20 gacha yutuq</div>
             <button class="play-btn">O'YNASH</button>
           </div>
         </div>
@@ -943,6 +966,180 @@
       </div>
     </div>
 
+    <!-- ⚽ PENALTY SHOOTOUT REAL-TIME LIVE MULTIPLAYER ARENA -->
+    <div class="game-arena-view" id="view-penalty" style="display: none;">
+      <div class="arena-header">
+        <button class="back-btn" id="backFromPenalty">⬅ Orqaga</button>
+        <span class="arena-title">PENALTY SHOOTOUT LIVE</span>
+        <div class="rl-online-badge">🟢 100% REAL ONLINE</div>
+      </div>
+
+      <div class="pn-stage-container">
+        <!-- Live Round & Status Header -->
+        <div class="pn-status-bar">
+          <div class="pn-round-tag" id="pnRoundTag">RAUND #7001</div>
+          <div class="pn-phase-info" id="pnPhaseText">STAVKALAR QABUL QILINMOQDA</div>
+          <div class="pn-timer-pill" id="pnTimerText">12.0s</div>
+        </div>
+
+        <!-- History Strip -->
+        <div class="pn-history-strip" id="pnHistoryStrip">
+          <!-- Filled dynamically with goal / save tags -->
+        </div>
+
+        <!-- Football Goal Pitch Stage -->
+        <div class="pn-pitch-stage">
+          <div class="pn-floodlights">
+            <div class="pn-light left"></div>
+            <div class="pn-light right"></div>
+          </div>
+          
+          <!-- Stadium Crowds and Net Backdrop -->
+          <div class="pn-goal-wrapper">
+            <div class="pn-goal-frame">
+              <!-- Net Pattern -->
+              <div class="pn-goal-net"></div>
+
+              <!-- 5 Interactive Target Zones -->
+              <button class="pn-target-zone pn-target-top-left active" data-target="top_left" data-label="↖️ Chap-Tepa (x3.20)" data-mult="3.20">
+                <span class="pn-tz-icon">🎯</span>
+                <span class="pn-tz-name">CHAP-TEPA</span>
+                <span class="pn-tz-mult">x3.20</span>
+              </button>
+
+              <button class="pn-target-zone pn-target-center" data-target="center" data-label="🎯 Markaz (x2.80)" data-mult="2.80">
+                <span class="pn-tz-icon">🎯</span>
+                <span class="pn-tz-name">MARKAZ</span>
+                <span class="pn-tz-mult">x2.80</span>
+              </button>
+
+              <button class="pn-target-zone pn-target-top-right" data-target="top_right" data-label="↗️ O'ng-Tepa (x3.20)" data-mult="3.20">
+                <span class="pn-tz-icon">🎯</span>
+                <span class="pn-tz-name">O'NG-TEPA</span>
+                <span class="pn-tz-mult">x3.20</span>
+              </button>
+
+              <button class="pn-target-zone pn-target-bottom-left" data-target="bottom_left" data-label="↙️ Chap-Past (x2.10)" data-mult="2.10">
+                <span class="pn-tz-icon">🎯</span>
+                <span class="pn-tz-name">CHAP-PAST</span>
+                <span class="pn-tz-mult">x2.10</span>
+              </button>
+
+              <button class="pn-target-zone pn-target-bottom-right" data-target="bottom_right" data-label="↘️ O'ng-Past (x2.10)" data-mult="2.10">
+                <span class="pn-tz-icon">🎯</span>
+                <span class="pn-tz-name">O'NG-PAST</span>
+                <span class="pn-tz-mult">x2.10</span>
+              </button>
+
+              <!-- Goalkeeper Character -->
+              <div class="pn-goalkeeper" id="pnGoalkeeper">
+                <div class="pn-gk-character">
+                  <div class="pn-gk-glove left">🧤</div>
+                  <div class="pn-gk-jersey">
+                    <span class="pn-gk-num">1</span>
+                  </div>
+                  <div class="pn-gk-glove right">🧤</div>
+                </div>
+              </div>
+
+              <!-- Animated Flying Ball -->
+              <div class="pn-ball" id="pnBall">⚽</div>
+            </div>
+          </div>
+
+          <!-- Penalty Spot Indicator -->
+          <div class="pn-penalty-spot-line">
+            <div class="pn-spot-circle"></div>
+          </div>
+
+          <!-- Result Celebration Banner Overlay -->
+          <div class="pn-result-banner" id="pnResultBanner" style="display:none;">
+            <div class="pn-rb-icon" id="pnRbIcon">⚽</div>
+            <div class="pn-rb-title" id="pnRbTitle">GOL!</div>
+            <div class="pn-rb-sub" id="pnRbSub">Zarba: O'ng-Tepa (x3.20)</div>
+          </div>
+        </div>
+
+        <!-- Quick Choices: Any Goal vs Keeper Save -->
+        <div class="pn-quick-choices">
+          <button class="pn-qc-btn pn-qc-goal" data-target="any_goal" data-label="⚽ HAR QANDAY GOL (x1.95)" data-mult="1.95">
+            <span class="pn-qc-ico">⚽</span>
+            <span class="pn-qc-title">GOL (IXTIYORIY)</span>
+            <span class="pn-qc-mult">x1.95</span>
+          </button>
+          <button class="pn-qc-btn pn-qc-save" data-target="save" data-label="🧤 DARVOZABON SEYVI (x2.50)" data-mult="2.50">
+            <span class="pn-qc-ico">🧤</span>
+            <span class="pn-qc-title">SEYV (QAYTARADI)</span>
+            <span class="pn-qc-mult">x2.50</span>
+          </button>
+        </div>
+
+        <!-- 1xBet Style Real-Time Online Players Table -->
+        <div class="rl-1xbet-live-card">
+          <div class="rl-1xb-header">
+            <div class="rl-1xb-head-left">
+              <span class="rl-pulse-radar"></span>
+              <span class="rl-1xb-title">1xBET JONLI O'YINCHILAR</span>
+              <span class="rl-1xb-badge" id="pnTotalPlayersBadge"><b id="pnTotalPlayers">0</b> o'yinchi</span>
+            </div>
+            <div class="rl-1xb-pool" id="pnTotalPool">BANK: 0 UZS</div>
+          </div>
+
+          <!-- Column Labels -->
+          <div class="rl-1xb-col-heads">
+            <span class="col-user">O'YINCHI</span>
+            <span class="col-choice">NISHON</span>
+            <span class="col-bet">STAVKA</span>
+            <span class="col-status">NATIJA / YUTUQ</span>
+          </div>
+
+          <!-- Real-Time List -->
+          <div class="rl-1xb-list" id="pnLiveBetsTable">
+            <div class="rl-empty-state">
+              <div class="rl-empty-ico">⚽</div>
+              <div class="rl-empty-title">Ushbu raundda hali hech kim stavka qilmadi</div>
+              <div class="rl-empty-sub">Darvoza nishonini tanlang va birinchi bo'lib stavka qiling!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Docked Bottom Betting Controller -->
+      <div class="arena-footer rl-arena-footer">
+        <div class="rl-footer-pick-row">
+          <span class="rl-fp-lbl">TANLANGAN NISHON:</span>
+          <span class="rl-fp-val" id="pnSelectedLabel">↖️ Chap-Tepa (x3.20)</span>
+        </div>
+
+        <div class="bet-row rl-bet-row">
+          <div class="b-input-wrap rl-input-wrap">
+            <button class="btn-b-step" id="pnMinus">-</button>
+            <input type="number" id="penaltyBetInput" value="5000" min="1000" step="1000" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+            <span class="b-curr">UZS</span>
+            <button class="btn-b-step" id="pnPlus">+</button>
+          </div>
+          <button class="btn-b-mod" id="pnHalf">/2</button>
+          <button class="btn-b-mod" id="pnDouble">2X</button>
+          <button class="btn-b-mod" id="pnMin">MIN</button>
+          <button class="btn-b-mod" id="pnMax">MAX</button>
+        </div>
+
+        <div class="chips-row rl-chips-row">
+          <button class="b-chip" data-v="1000">1K</button>
+          <button class="b-chip" data-v="5000">5K</button>
+          <button class="b-chip" data-v="10000">10K</button>
+          <button class="b-chip" data-v="25000">25K</button>
+          <button class="b-chip" data-v="50000">50K</button>
+          <button class="b-chip" data-v="100000">100K</button>
+        </div>
+
+        <!-- Big Action Button -->
+        <button class="btn-crash-action btn-ready rl-action-main-btn" id="pnActionBtn">
+          STAVKA QILISH (↖️ Chap-Tepa (x3.20))
+        </button>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-tasks">
       <div class="section-card tasks-card">
         <div class="tasks-cycle-banner">
@@ -1068,6 +1265,6 @@
 
   </div>
 
-  <script src="game.js?v=5.3"></script>
+  <script src="game.js?v=5.4"></script>
 </body>
 </html>

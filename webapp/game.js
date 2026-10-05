@@ -192,6 +192,26 @@ const appState = {
     lastHistorySignature: "",
     resultHandledRound: 0,
     spinStartTime: 0
+  },
+
+  pn: {
+    roundId: 7001,
+    phase: "betting",
+    timeLeft: 12.0,
+    bet: 5000,
+    selectedTarget: "top_left",
+    selectedLabel: "↖️ Chap-Tepa (x3.20)",
+    selectedMult: 3.20,
+    shotTarget: null,
+    keeperDive: null,
+    isGoal: null,
+    history: [],
+    myBetPlaced: false,
+    pollTimer: null,
+    lastBetsSignature: "",
+    lastHistorySignature: "",
+    resultHandledRound: 0,
+    shotAnimRound: 0
   }
 };
 
@@ -395,6 +415,30 @@ class AudioEngine {
         gain.connect(this.ctx.destination);
         osc.start();
         osc.stop(this.ctx.currentTime + 0.05);
+      } else if (type === "kick") {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      } else if (type === "whistle") {
+        [2800, 3100].forEach((f, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(f, this.ctx.currentTime + i * 0.08);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.08 + 0.1);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + i * 0.08);
+          osc.stop(this.ctx.currentTime + i * 0.08 + 0.1);
+        });
       } else if (type === "gem") {
         const osc = this.ctx.createOscillator();
         const osc2 = this.ctx.createOscillator();
@@ -728,6 +772,8 @@ const TASK_ICONS = {
   play_dice: "🎲",
   play_wheel: "🎡",
   play_coinflip: "🪙",
+  play_roulette: "🎰",
+  play_penalty: "⚽",
   reach_multiplier: "⚡",
   win_games: "🏆",
   high_stake: "💰",
@@ -1033,7 +1079,8 @@ function openGameView(viewId) {
     "view-dice": "dcBetInput",
     "view-wheel": "whBetInput",
     "view-coinflip": "cfBetInput",
-    "view-roulette": "rlBetInput"
+    "view-roulette": "rlBetInput",
+    "view-penalty": "penaltyBetInput"
   };
   const inputId = betInputMap[viewId];
   if (inputId) {
@@ -1061,6 +1108,12 @@ function openGameView(viewId) {
   } else {
     stopRoulettePolling();
   }
+
+  if (viewId === "view-penalty") {
+    initPenaltyGame();
+  } else {
+    stopPenaltyPolling();
+  }
 }
 
 function returnToLobby() {
@@ -1069,6 +1122,7 @@ function returnToLobby() {
   stopCoinFlipPolling();
   stopAviatorOnlinePolling();
   stopRoulettePolling();
+  stopPenaltyPolling();
   document.getElementById("app")?.classList.remove("in-game");
   document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -1092,6 +1146,7 @@ document.getElementById("backFromDice")?.addEventListener("click", returnToLobby
 document.getElementById("backFromWheel")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromCoinflip")?.addEventListener("click", returnToLobby);
 document.getElementById("backFromRoulette")?.addEventListener("click", returnToLobby);
+document.getElementById("backFromPenalty")?.addEventListener("click", returnToLobby);
 
 document.getElementById("bannerRefBtn").addEventListener("click", () => {
   document.querySelector('.tab-btn[data-tab="referral"]').click();
@@ -1156,6 +1211,13 @@ document.querySelectorAll('.game-card[data-game="roulette"]').forEach(c => {
   c.addEventListener("click", () => {
     openGameView("view-roulette");
     initRouletteGame();
+  });
+});
+
+document.querySelectorAll('.game-card[data-game="penalty"]').forEach(c => {
+  c.addEventListener("click", () => {
+    openGameView("view-penalty");
+    initPenaltyGame();
   });
 });
 
@@ -5007,4 +5069,351 @@ renderAppleBoard();
 renderMinesBoard();
 renderDicePips(1, 6);
 initWheelCanvas();
+
+// ============================================================================
+// ⚽ REAL-TIME MULTIPLAYER PENALTY SHOOTOUT LIVE SYSTEM
+// ============================================================================
+
+function initPenaltyGame() {
+  startPenaltyPolling();
+  setupPenaltyControls();
+}
+
+function startPenaltyPolling() {
+  stopPenaltyPolling();
+  fetchPenaltyStatus();
+  appState.pn.pollTimer = setInterval(fetchPenaltyStatus, 800);
+}
+
+function stopPenaltyPolling() {
+  if (appState.pn.pollTimer) {
+    clearInterval(appState.pn.pollTimer);
+    appState.pn.pollTimer = null;
+  }
+}
+
+function setupPenaltyControls() {
+  // Target zones in goal:
+  document.querySelectorAll(".pn-target-zone").forEach(tz => {
+    tz.onclick = () => {
+      document.querySelectorAll(".pn-target-zone, .pn-qc-btn").forEach(el => el.classList.remove("active"));
+      tz.classList.add("active");
+      appState.pn.selectedTarget = tz.dataset.target;
+      appState.pn.selectedLabel = tz.dataset.label;
+      appState.pn.selectedMult = parseFloat(tz.dataset.mult) || 2.10;
+      updatePenaltySelectedDisplay();
+      audio.play("click");
+      triggerHaptic("light");
+    };
+  });
+
+  // Quick choice buttons (any_goal vs save):
+  document.querySelectorAll(".pn-qc-btn").forEach(qc => {
+    qc.onclick = () => {
+      document.querySelectorAll(".pn-target-zone, .pn-qc-btn").forEach(el => el.classList.remove("active"));
+      qc.classList.add("active");
+      appState.pn.selectedTarget = qc.dataset.target;
+      appState.pn.selectedLabel = qc.dataset.label;
+      appState.pn.selectedMult = parseFloat(qc.dataset.mult) || 1.95;
+      updatePenaltySelectedDisplay();
+      audio.play("click");
+      triggerHaptic("light");
+    };
+  });
+
+  // Stepper & Modifiers:
+  const pInput = document.getElementById("penaltyBetInput");
+  const getPVal = () => Math.max(1000, parseInt(pInput?.value || "5000", 10) || 5000);
+  const setPVal = (v) => {
+    if (!pInput) return;
+    const clamped = Math.max(1000, Math.min(1000000000, Math.floor(v)));
+    pInput.value = clamped;
+    audio.play("click");
+    triggerHaptic("light");
+  };
+
+  document.getElementById("pnMinus")?.addEventListener("click", () => setPVal(getPVal() - 1000));
+  document.getElementById("pnPlus")?.addEventListener("click", () => setPVal(getPVal() + 1000));
+  document.getElementById("pnHalf")?.addEventListener("click", () => setPVal(Math.max(1000, Math.floor(getPVal() / 2))));
+  document.getElementById("pnDouble")?.addEventListener("click", () => setPVal(getPVal() * 2));
+  document.getElementById("pnMin")?.addEventListener("click", () => setPVal(1000));
+  document.getElementById("pnMax")?.addEventListener("click", () => setPVal(Math.max(1000, appState.balance || 1000)));
+
+  document.querySelectorAll("#view-penalty .chips-row .b-chip").forEach(chip => {
+    chip.onclick = () => {
+      const v = parseInt(chip.dataset.v, 10);
+      if (v) setPVal(v);
+    };
+  });
+
+  // Action Button (Place Bet or Cancel Bet):
+  const actionBtn = document.getElementById("pnActionBtn");
+  if (actionBtn) {
+    actionBtn.onclick = async () => {
+      if (appState.pn.phase !== "betting") {
+        showToast("⏳ Stavka qabul qilish vaqti tugadi! Zarba berilmoqda.", false);
+        return;
+      }
+
+      if (appState.pn.myBetPlaced) {
+        // Cancel bet
+        audio.play("click");
+        triggerHaptic("medium");
+        const res = await apiFetch("/api/penalty/cancel", "POST", { user_id: USER_ID });
+        if (res?.ok) {
+          appState.pn.myBetPlaced = false;
+          updateBalanceUI(res.balance);
+          showToast("↩️ Stavka bekor qilindi, mablag' qaytarildi!", true);
+          fetchPenaltyStatus();
+        } else {
+          showToast(res?.error || "Bekor qilib bo'lmadi", false);
+        }
+        return;
+      }
+
+      // Place bet
+      const betVal = getValidatedBet("penaltyBetInput");
+      if (!betVal) return;
+
+      audio.play("click");
+      triggerHaptic("medium");
+      const res = await apiFetch("/api/penalty/bet", "POST", {
+        user_id: USER_ID,
+        bet: betVal,
+        choice: appState.pn.selectedTarget,
+        choice_label: appState.pn.selectedLabel,
+        first_name: FIRST_NAME,
+        username: USERNAME
+      });
+
+      if (res?.ok) {
+        appState.pn.myBetPlaced = true;
+        updateBalanceUI(res.balance);
+        showToast(`✅ ${formatMoney(betVal)} UZS stavka qabul qilindi! (${appState.pn.selectedLabel})`, true);
+        fetchPenaltyStatus();
+      } else {
+        showToast(`❌ ${res?.error || "Xatolik"}`, false);
+      }
+    };
+  }
+}
+
+function updatePenaltySelectedDisplay() {
+  const lbl = document.getElementById("pnSelectedLabel");
+  if (lbl) lbl.textContent = appState.pn.selectedLabel;
+  const btn = document.getElementById("pnActionBtn");
+  if (btn && !appState.pn.myBetPlaced && appState.pn.phase === "betting") {
+    btn.textContent = `STAVKA QILISH (${appState.pn.selectedLabel})`;
+  }
+}
+
+async function fetchPenaltyStatus() {
+  const activeView = document.querySelector('.game-arena-view:not([style*="display: none"])');
+  if (!activeView || activeView.id !== "view-penalty") return;
+
+  try {
+    const data = await apiFetch(`/api/penalty/status?user_id=${USER_ID}`);
+    if (!data?.ok) return;
+
+    appState.pn.phase = data.phase;
+    appState.pn.roundId = data.round_id;
+    appState.pn.timeLeft = data.time_left;
+
+    const roundTag = document.getElementById("pnRoundTag");
+    if (roundTag) roundTag.textContent = `RAUND #${data.round_id}`;
+    const timerText = document.getElementById("pnTimerText");
+    if (timerText) timerText.textContent = `${Math.max(0, data.time_left).toFixed(1)}s`;
+    const phaseText = document.getElementById("pnPhaseText");
+    const actionBtn = document.getElementById("pnActionBtn");
+    const ballEl = document.getElementById("pnBall");
+    const gkEl = document.getElementById("pnGoalkeeper");
+    const bannerEl = document.getElementById("pnResultBanner");
+
+    if (data.phase === "betting") {
+      appState.pn.shotAnimRound = 0;
+      if (phaseText) phaseText.textContent = "STAVKALAR QABUL QILINMOQDA";
+      if (bannerEl) bannerEl.style.display = "none";
+      if (ballEl) ballEl.className = "pn-ball";
+      if (gkEl) gkEl.className = "pn-goalkeeper";
+      document.querySelectorAll(".pn-target-zone").forEach(t => t.classList.remove("shot-hit"));
+
+      if (data.user_bet) {
+        appState.pn.myBetPlaced = true;
+        if (actionBtn) {
+          actionBtn.className = "btn-crash-action btn-cashed-mode rl-action-main-btn";
+          actionBtn.textContent = `BEKOR QILISH (-${formatMoney(data.user_bet.bet)} UZS)`;
+        }
+      } else {
+        appState.pn.myBetPlaced = false;
+        if (actionBtn) {
+          actionBtn.className = "btn-crash-action btn-ready rl-action-main-btn";
+          actionBtn.textContent = `STAVKA QILISH (${appState.pn.selectedLabel})`;
+        }
+      }
+    } else if (data.phase === "shooting") {
+      if (phaseText) phaseText.textContent = "ZARBA BERILMOQDA! ⚽🏃‍♂️";
+      if (actionBtn) {
+        actionBtn.className = "btn-crash-action btn-ready rl-action-main-btn";
+        actionBtn.textContent = "ZARBA BERILMOQDA... ⚽";
+      }
+
+      if (appState.pn.shotAnimRound !== data.round_id) {
+        appState.pn.shotAnimRound = data.round_id;
+        audio.play("kick");
+        triggerHaptic("medium");
+
+        const shotTarget = data.shot_target || "center";
+        const keeperDive = data.keeper_dive || "center";
+
+        if (ballEl) {
+          ballEl.className = `pn-ball shoot-${shotTarget.replace("_", "-")}`;
+        }
+        if (gkEl) {
+          gkEl.className = `pn-goalkeeper dive-${keeperDive.replace("_", "-")}`;
+        }
+
+        const hitZone = document.querySelector(`.pn-target-zone[data-target="${shotTarget}"]`);
+        if (hitZone) hitZone.classList.add("shot-hit");
+      }
+    } else if (data.phase === "result") {
+      if (phaseText) phaseText.textContent = data.is_goal ? "GOL! 🎉⚽" : "SEYV! 🧤🚫";
+
+      if (appState.pn.resultHandledRound !== data.round_id) {
+        appState.pn.resultHandledRound = data.round_id;
+
+        if (bannerEl) {
+          bannerEl.style.display = "block";
+          const rbIcon = document.getElementById("pnRbIcon");
+          const rbTitle = document.getElementById("pnRbTitle");
+          const rbSub = document.getElementById("pnRbSub");
+
+          if (data.is_goal) {
+            bannerEl.className = "pn-result-banner goal";
+            if (rbIcon) rbIcon.textContent = "⚽";
+            if (rbTitle) rbTitle.textContent = "GOL!";
+            if (rbSub) rbSub.textContent = `Zarba: ${(data.shot_target || "").toUpperCase()} (x${(data.multiplier || 2.8).toFixed(2)})`;
+            audio.play("whistle");
+            triggerScreenShake();
+          } else {
+            bannerEl.className = "pn-result-banner save";
+            if (rbIcon) rbIcon.textContent = "🧤";
+            if (rbTitle) rbTitle.textContent = "SEYV!";
+            if (rbSub) rbSub.textContent = "Darvozabon to'pni qaytardi!";
+            audio.play("whistle");
+            triggerScreenShake();
+          }
+        }
+
+        if (data.user_bet) {
+          if (data.user_bet.status === "won") {
+            audio.play("win");
+            triggerHaptic("success");
+            fx.confetti();
+            showToast(`🎉 G'ALABA! +${formatMoney(data.user_bet.win)} UZS (${(data.user_bet.multiplier || 2).toFixed(2)}x)!`, true);
+          } else {
+            audio.play("boom");
+            triggerHaptic("error");
+            showToast(`❌ Yutuq chiqmadi (-${formatMoney(data.user_bet.bet)} UZS)`, false);
+          }
+        }
+
+        if (typeof data.balance === "number") {
+          updateBalanceUI(data.balance);
+        }
+      }
+
+      if (actionBtn) {
+        if (data.user_bet && data.user_bet.status === "won") {
+          actionBtn.className = "btn-crash-action btn-cashout-mode rl-action-main-btn";
+          actionBtn.textContent = `YUTUQ: +${formatMoney(data.user_bet.win)} UZS 🎉`;
+        } else {
+          actionBtn.className = "btn-crash-action btn-ready rl-action-main-btn";
+          actionBtn.textContent = "KEYINGI RAUND KUTILMOQDA...";
+        }
+      }
+    }
+
+    // Render History Strip:
+    renderPenaltyHistory(data.history || []);
+
+    // Render Real-Time Online Bets:
+    renderPenaltyBets(data.bets || []);
+
+  } catch (e) {}
+}
+
+function renderPenaltyHistory(histList) {
+  const container = document.getElementById("pnHistoryStrip");
+  if (!container) return;
+  const sig = JSON.stringify(histList);
+  if (appState.pn.lastHistorySignature === sig) return;
+  appState.pn.lastHistorySignature = sig;
+
+  container.innerHTML = histList.map(h => {
+    if (h.goal) {
+      return `<span class="pn-hist-chip goal">⚽ GOL x${(h.mult || 2.1).toFixed(2)}</span>`;
+    } else {
+      return `<span class="pn-hist-chip save">🧤 SEYV</span>`;
+    }
+  }).join("");
+}
+
+function renderPenaltyBets(betsList) {
+  const table = document.getElementById("pnLiveBetsTable");
+  const totalCount = document.getElementById("pnTotalPlayers");
+  const totalPool = document.getElementById("pnTotalPool");
+  if (!table) return;
+
+  const totalSum = betsList.reduce((acc, b) => acc + (b.bet || 0), 0);
+  if (totalCount) totalCount.textContent = betsList.length;
+  if (totalPool) totalPool.textContent = `BANK: ${formatMoney(totalSum)} UZS`;
+
+  const sig = JSON.stringify(betsList);
+  if (appState.pn.lastBetsSignature === sig) return;
+  appState.pn.lastBetsSignature = sig;
+
+  if (betsList.length === 0) {
+    table.innerHTML = `
+      <div class="rl-empty-state">
+        <div class="rl-empty-ico">⚽</div>
+        <div class="rl-empty-title">Ushbu raundda hali hech kim stavka qilmadi</div>
+        <div class="rl-empty-sub">Darvoza nishonini tanlang va birinchi bo'lib stavka qiling!</div>
+      </div>
+    `;
+    return;
+  }
+
+  table.innerHTML = betsList.map(b => {
+    const isMe = b.user_id === USER_ID;
+    let stHtml = '<span class="rl-status-waiting">⏳ Kutilmoqda</span>';
+    if (b.status === "won") {
+      stHtml = `<span class="rl-status-won">+${formatMoney(b.win)} UZS</span>`;
+    } else if (b.status === "lost") {
+      stHtml = '<span class="rl-status-lost">💥 Yutqazdi</span>';
+    }
+
+    const tgHandle = b.username ? `@${b.username}` : (b.user_id ? `ID: ${b.user_id}` : "");
+    const displayName = escapeHtml(b.name || "O'yinchi");
+
+    return `
+      <div class="rl-1xb-row ${isMe ? 'my-bet-row' : ''}">
+        <div class="col-user">
+          <div class="rl-u-avatar">${isMe ? '⭐' : '⚽'}</div>
+          <div class="rl-u-details">
+            <span class="rl-u-name">${displayName} ${isMe ? '<b style="color:#2ed573;">(SIZ)</b>' : ''}</span>
+            <span class="rl-u-handle">${tgHandle}</span>
+          </div>
+        </div>
+        <div class="col-choice">
+          <span class="rl-bet-badge chip-other">${escapeHtml(b.choice_label || b.choice)}</span>
+        </div>
+        <div class="col-bet">
+          <span class="rl-bet-amt">${formatMoney(b.bet)} UZS</span>
+        </div>
+        <div class="col-status">${stHtml}</div>
+      </div>
+    `;
+  }).join("");
+}
+
 
